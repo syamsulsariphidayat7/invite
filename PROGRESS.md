@@ -15,7 +15,7 @@ Terakhir diperbarui: 2026-09-04
 | Deployment (Vercel + Neon) | 🔄 Berjalan — commit/push pertama; deploy Vercel menyusul |
 
 ## Sedang Dikerjakan
-- Commit & push awal ke GitHub (staged: 49 file, +5315 baris).
+- Import repo di Vercel + set `DATABASE_URL` + deploy.
 
 ## Sudah Selesai
 - Undangan lengkap: layar sampul + musik, hero, mempelai, ayat, countdown, akad & resepsi (20–21 Sep 2026), galeri, love story 3 bab, amplop digital, ucapan tamu → Neon, nav bawah, footer.
@@ -27,7 +27,7 @@ Terakhir diperbarui: 2026-09-04
 - Deploy Vercel + set env `DATABASE_URL` belum dilakukan (menunggu push GitHub).
 
 ## Langkah Berikutnya
-1. Push commit awal ke GitHub ✅ (sesi ini)
+1. ✅ Push commit awal ke GitHub — commit `d6a2938` di `main` (repo: syamsulsariphidayat7/invite)
 2. Import repo di Vercel, set `DATABASE_URL` (pooled), deploy
 3. Ganti foto placeholder dengan foto asli
 4. (Opsional) Mulai fondasi multi-tema: tabel `weddings` + rute `/invitation/[slug]` + panel admin
