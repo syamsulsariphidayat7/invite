@@ -22,12 +22,14 @@ Terakhir diperbarui: 2026-09-04
 - Verifikasi penuh: `pnpm check` (0 error), `pnpm build` (exit 0), API `/api/wishes` tersimpan & terbaca di Neon, screenshot mobile & desktop.
 
 ## Blocker / Catatan
-- **Foto asli belum dipasang** — masih placeholder SVG di `static/photos/placeholders/`; user punya foto, tinggal mengganti file sesuai `static/photos/README.md`.
 - **String koneksi Neon sempat terekspos di chat** — disarankan Reset password di dashboard Neon setelah deploy (`.env` lokal sudah aman di-gitignore).
 - Deploy Vercel + set env `DATABASE_URL` belum dilakukan (menunggu push GitHub).
+- **Foto asli sudah terpasang** (Sep 2026): 15 foto di-rename ke nama template — hero, bride, groom, gallery-1..12. Bride/groom sudah dikonfirmasi via file `pria.jpg`/`wanita.jpg` dari user.
+- **Musik latar aktif**: Christina Perri — A Thousand Years (`rtOvBOTyX00`), mulai detik ke-5.
 
 ## Langkah Berikutnya
 1. ✅ Push commit awal ke GitHub — commit `d6a2938` di `main` (repo: syamsulsariphidayat7/invite)
 2. Import repo di Vercel, set `DATABASE_URL` (pooled), deploy
-3. Ganti foto placeholder dengan foto asli
-4. (Opsional) Mulai fondasi multi-tema: tabel `weddings` + rute `/invitation/[slug]` + panel admin
+3. ✅ Ganti foto placeholder dengan foto asli — 15 foto terpasang (hero, bride, groom, galeri 12)
+4. ✅ Musik latar — A Thousand Years (Christina Perri)
+5. (Opsional) Mulai fondasi multi-tema: tabel `weddings` + rute `/invitation/[slug]` + panel admin

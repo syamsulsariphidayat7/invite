@@ -10,7 +10,7 @@
 	<div class="wrap-wide">
 		<!-- ============ MEMPELAI WANITA ============ -->
 		<div class="person" data-reveal>
-			<div class="photo-frame">
+			<div class="photo-frame" data-reveal="zoom" style="--d:.15s">
 				<Photo base={wedding.photos.bride} alt={`Foto ${wedding.bride.name}`} eager />
 				<span class="photo-ring" aria-hidden="true"></span>
 			</div>
@@ -37,7 +37,7 @@
 
 		<!-- ============ MEMPELAI PRIA ============ -->
 		<div class="person reverse" data-reveal>
-			<div class="photo-frame">
+			<div class="photo-frame" data-reveal="zoom" style="--d:.15s">
 				<Photo base={wedding.photos.groom} alt={`Foto ${wedding.groom.name}`} eager />
 				<span class="photo-ring" aria-hidden="true"></span>
 			</div>

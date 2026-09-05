@@ -189,6 +189,15 @@
 		opacity: 1;
 	}
 
+	/* zoom halus foto saat hover (micro-interaction ala referensi) */
+	.cell :global(.photo-img) {
+		transition: transform 0.7s cubic-bezier(0.2, 0.7, 0.25, 1);
+	}
+
+	.cell:hover :global(.photo-img) {
+		transform: scale(1.08);
+	}
+
 	/* lightbox */
 	.lightbox {
 		position: fixed;

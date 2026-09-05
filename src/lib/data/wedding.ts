@@ -96,7 +96,20 @@ export const wedding = {
 		cover: 'hero', // latar sampul "Buka Undangan"
 		bride: 'bride',
 		groom: 'groom',
-		gallery: ['gallery-1', 'gallery-2', 'gallery-3', 'gallery-4', 'gallery-5', 'gallery-6', 'gallery-7', 'gallery-8']
+		gallery: [
+			'gallery-1',
+			'gallery-2',
+			'gallery-3',
+			'gallery-4',
+			'gallery-5',
+			'gallery-6',
+			'gallery-7',
+			'gallery-8',
+			'gallery-9',
+			'gallery-10',
+			'gallery-11',
+			'gallery-12'
+		]
 	},
 
 	// ---- Kutipan / Ayat ----
@@ -151,9 +164,10 @@ export const wedding = {
 
 	// ---- Musik latar ----
 	// Isi youtubeId dengan ID lagu YouTube (bisa privat/unlisted), atau kosongkan.
-	// Contoh ID: "dQw4w9WgXcQ". Audio mengikuti pola "mulai dari detik ke-5".
+	// Saat ini: Christina Perri — A Thousand Years (video resmi).
+	// Audio mengikuti pola "mulai dari detik ke-5".
 	music: {
-		youtubeId: '',
+		youtubeId: 'rtOvBOTyX00',
 		startSeconds: 5
 	},
 

@@ -72,8 +72,8 @@
 		setupReveals();
 		window.scrollTo({ top: 0 });
 
-		// lepas overlay setelah fade-out selesai
-		setTimeout(() => (overlayVisible = false), 950);
+		// lepas overlay setelah animasi tirai selesai (3s + jeda)
+		setTimeout(() => (overlayVisible = false), 3200);
 	}
 </script>
 

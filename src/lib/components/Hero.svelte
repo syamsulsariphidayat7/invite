@@ -2,6 +2,7 @@
 	import { CalendarPlus, ChevronDown } from 'lucide-svelte';
 	import { wedding, calendarUrl } from '$lib/data/wedding';
 	import Photo from './Photo.svelte';
+	import Particles from './Particles.svelte';
 </script>
 
 <section id="home" class="hero" aria-label="Pembukaan undangan">
@@ -9,6 +10,9 @@
 		<Photo base={wedding.photos.hero} alt="Foto pasangan Ruhaeni & Roni" eager />
 	</div>
 	<div class="veil"></div>
+
+	<!-- partikel jatuh ala referensi (pp-bg-effects: snow, 35 partikel putih) -->
+	<Particles count={35} color="rgba(255, 255, 255, 0.75)" />
 
 	<div class="content">
 		<p class="kicker-soft" data-reveal>The Wedding Of</p>
@@ -60,6 +64,7 @@
 
 	.content {
 		position: relative;
+		z-index: 2;
 		text-align: center;
 		color: #fff;
 		padding: 6rem 1.5rem 8rem;

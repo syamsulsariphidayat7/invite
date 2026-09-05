@@ -8,7 +8,10 @@ Ekstensi yang otomatis dicoba: `.jpg` → `.jpeg` → `.png` → `.webp` → pla
 | `hero.jpg`     | Latar layar pembuka (hero) & sampul |
 | `bride.jpg`    | Foto mempelai wanita                |
 | `groom.jpg`    | Foto mempelai pria                  |
-| `gallery-1.jpg` s/d `gallery-8.jpg` | Galeri foto |
+| `gallery-1.jpg` s/d `gallery-12.jpg` | Galeri foto |
+
+Semua slot sudah terisi foto asli (Sep 2026). Jika ingin mengganti, cukup
+overwrite file dengan nama yang sama. Ukuran asli: potret 1866×2800.
 
 Tips:
 

@@ -194,6 +194,11 @@
 		will-change: opacity, transform;
 	}
 
+	/* varian zoomIn (foto) sesuai referensi Elementor */
+	:global(html.js [data-reveal='zoom']) {
+		transform: scale(0.9);
+	}
+
 	:global(html.js [data-reveal].is-in) {
 		opacity: 1;
 		transform: none;

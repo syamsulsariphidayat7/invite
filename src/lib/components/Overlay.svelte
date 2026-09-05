@@ -54,11 +54,13 @@
 		display: grid;
 		place-items: center;
 		overflow-y: auto;
-		transition: opacity 0.9s ease, visibility 0.9s ease;
+		/* efek tirai: overlay naik ke atas (sama seperti referensi removeModals) */
+		transition: transform 3s ease-in-out, visibility 0s linear 3s;
+		will-change: transform;
 	}
 
 	.cover.hide {
-		opacity: 0;
+		transform: translateY(-200%);
 		visibility: hidden;
 		pointer-events: none;
 	}
