@@ -21,7 +21,7 @@
 		"vite": "^8.0.16"
 	},
 	"dependencies": {
-		"@neondatabase/serverless": "^1.1.0",
-		"lucide-svelte": "^1.0.1"
+		"lucide-svelte": "^1.0.1",
+		"postgres": "^3.4.9"
 	}
 }
