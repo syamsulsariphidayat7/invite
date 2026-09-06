@@ -3,6 +3,8 @@
 	import { wedding, calendarUrl } from '$lib/data/wedding';
 	import Photo from './Photo.svelte';
 	import Particles from './Particles.svelte';
+
+	const heroNames = wedding.namesShort.split(' & ');
 </script>
 
 <section id="home" class="hero" aria-label="Pembukaan undangan">
@@ -14,12 +16,23 @@
 	<!-- partikel jatuh ala referensi (pp-bg-effects: snow, 35 partikel putih) -->
 	<Particles count={35} color="rgba(255, 255, 255, 0.75)" />
 
+	<img
+		class="flower-decor"
+		src="/decor/flower-ed-02.png"
+		alt=""
+		aria-hidden="true"
+		loading="eager"
+		decoding="async"
+		data-reveal
+		style="--d:.36s"
+	/>
+
 	<div class="content">
 		<p class="kicker-soft" data-reveal>The Wedding Of</p>
 		<h1 class="names" data-reveal style="--d:.08s">
-			{wedding.namesShort}
+			<span class="n">{heroNames[0]}</span><span class="amp">&</span><span class="n">{heroNames[1] ?? ''}</span>
 		</h1>
-		<p class="date" data-reveal style="--d:.16s">{wedding.akad.dayLabel}</p>
+		<p class="date" data-reveal style="--d:.16s">{wedding.resepsi.dayLabel}</p>
 
 		<div class="cta" data-reveal style="--d:.24s">
 			<a class="btn-save" href={calendarUrl} target="_blank" rel="noopener">
@@ -57,18 +70,72 @@
 	.veil {
 		position: absolute;
 		inset: 0;
-		background:
-			linear-gradient(180deg, rgba(17, 24, 12, 0.45) 0%, rgba(17, 24, 12, 0.15) 40%, rgba(17, 24, 12, 0.78) 100%),
-			radial-gradient(90% 60% at 50% 55%, transparent 40%, rgba(17, 24, 12, 0.4));
+		z-index: 1;
+		pointer-events: none;
+		background: linear-gradient(
+			180deg,
+			rgba(43, 43, 43, 0.28) 0%,
+			rgba(43, 43, 43, 0.1) 16%,
+			transparent 30%,
+			transparent 38%,
+			rgba(43, 43, 43, 0.35) 58%,
+			rgba(43, 43, 43, 0.72) 80%,
+			rgba(43, 43, 43, 0.92) 100%
+		);
+	}
+
+	.flower-decor {
+		position: absolute;
+		right: -18px;
+		bottom: -18px;
+		z-index: 2;
+		width: clamp(180px, 38vw, 420px);
+		height: auto;
+		pointer-events: none;
+		opacity: 0.96;
+		transform-origin: bottom right;
+		filter: drop-shadow(0 12px 22px rgba(107, 107, 107, 0.28));
+	}
+
+	@media (max-width: 640px) {
+		.flower-decor {
+			width: clamp(140px, 48vw, 240px);
+			right: -8px;
+			bottom: -6px;
+			opacity: 0.88;
+		}
 	}
 
 	.content {
 		position: relative;
-		z-index: 2;
+		z-index: 3;
 		text-align: center;
 		color: #fff;
-		padding: 6rem 1.5rem 8rem;
+		padding: 7rem 1.5rem 5rem;
 		max-width: 700px;
+		isolation: isolate;
+	}
+
+	.content::before {
+		content: '';
+		position: absolute;
+		inset: 4% -10% 4% -10%;
+		z-index: -1;
+		pointer-events: none;
+		background: radial-gradient(
+			ellipse 68% 62% at 50% 46%,
+			rgba(43, 43, 43, 0.42) 0%,
+			rgba(43, 43, 43, 0.2) 42%,
+			transparent 72%
+		);
+		filter: blur(16px);
+		border-radius: 32px;
+	}
+
+	@media (max-width: 640px) {
+		.content {
+			padding: 5rem 1.25rem 5rem;
+		}
 	}
 
 	.kicker-soft {
@@ -78,17 +145,34 @@
 		font-size: 12px;
 		margin: 0 0 1rem;
 		color: rgba(255, 255, 255, 0.9);
-		text-shadow: 0 2px 18px rgba(0, 0, 0, 0.5);
+		text-shadow: 0 2px 20px rgba(43, 43, 43, 0.85), 0 1px 6px rgba(43, 43, 43, 0.7);
 	}
 
 	.names {
 		margin: 0;
-		font-family: var(--font-script);
+		display: flex;
+		align-items: baseline;
+		justify-content: center;
+		flex-wrap: wrap;
+		gap: 0.28em;
+		font-family: 'Great Vibes', 'Pinyon Script', cursive;
 		font-weight: 400;
-		font-size: clamp(54px, 15vw, 110px);
-		line-height: 1.08;
+		font-size: clamp(42px, 11vw, 78px);
+		line-height: 1;
+		letter-spacing: 0.02em;
 		color: #fff;
-		text-shadow: 0 6px 44px rgba(0, 0, 0, 0.5);
+		text-shadow: 0 4px 28px rgba(43, 43, 43, 0.85), 0 10px 44px rgba(43, 43, 43, 0.55);
+	}
+
+	.names .amp {
+		font-family: var(--font-serif);
+		font-style: italic;
+		font-weight: 300;
+		font-size: 0.42em;
+		letter-spacing: 0.08em;
+		opacity: 0.92;
+		align-self: center;
+		transform: translateY(-0.15em);
 	}
 
 	.date {
@@ -106,20 +190,20 @@
 		align-items: center;
 		gap: 0.6em;
 		text-decoration: none;
-		color: #23341a;
-		background: linear-gradient(135deg, #e9dcc0, #c5b297);
+		color: #2b2b2b;
+		background: linear-gradient(135deg, #e9e9e9, #b0b0b0);
 		font-weight: 600;
 		font-size: 14px;
 		letter-spacing: 0.08em;
 		padding: 0.9em 1.9em;
 		border-radius: 999px;
-		box-shadow: 0 12px 34px rgba(0, 0, 0, 0.35);
+		box-shadow: 0 14px 36px rgba(43, 43, 43, 0.45);
 		transition: transform 0.25s ease, box-shadow 0.25s ease;
 	}
 
 	.cta .btn-save:hover {
 		transform: translateY(-2px);
-		box-shadow: 0 16px 40px rgba(0, 0, 0, 0.42);
+		box-shadow: 0 18px 44px rgba(43, 43, 43, 0.55);
 	}
 
 	.dear-note {
@@ -127,8 +211,8 @@
 		max-width: 30em;
 		font-size: 13px;
 		line-height: 1.8;
-		color: rgba(255, 255, 255, 0.75);
-		text-shadow: 0 1px 12px rgba(0, 0, 0, 0.6);
+		color: rgba(255, 255, 255, 0.85);
+		text-shadow: 0 2px 16px rgba(43, 43, 43, 0.85), 0 1px 4px rgba(43, 43, 43, 0.7);
 	}
 
 	.scroll-cue {
@@ -136,7 +220,7 @@
 		bottom: 1.4rem;
 		left: 50%;
 		transform: translateX(-50%);
-		z-index: 2;
+		z-index: 3;
 		width: 40px;
 		height: 40px;
 		border-radius: 50%;
@@ -145,7 +229,7 @@
 		place-items: center;
 		color: #fff;
 		animation: bob 2.2s ease-in-out infinite;
-		background: rgba(17, 24, 12, 0.25);
+		background: rgba(107, 107, 107, 0.28);
 	}
 
 	@keyframes bob {

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { Home, Heart, CalendarDays, Images, Gift, MessageCircle } from 'lucide-svelte';
 
 	const items = [
@@ -9,13 +10,44 @@
 		{ id: 'gift', label: 'Gift', Icon: Gift },
 		{ id: 'wishes', label: 'Wishes', Icon: MessageCircle }
 	];
+
+	let active = $state('home');
+
+	onMount(() => {
+		const ids = items.map((i) => i.id);
+		const els = ids.map((id) => document.getElementById(id)).filter(Boolean) as HTMLElement[];
+		if (!els.length) return;
+		const io = new IntersectionObserver(
+			(entries) => {
+				const vis = entries.filter((e) => e.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+				if (vis[0]?.target.id) active = vis[0].target.id;
+			},
+			{ rootMargin: '-20% 0px -40% 0px', threshold: [0.1, 0.25, 0.5, 0.75] }
+		);
+		els.forEach((el) => io.observe(el));
+		const onScroll = () => {
+			if (window.scrollY < 120) {
+				active = 'home';
+				return;
+			}
+			if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 160) {
+				active = 'wishes';
+			}
+		};
+		window.addEventListener('scroll', onScroll, { passive: true });
+		onScroll();
+		return () => {
+			io.disconnect();
+			window.removeEventListener('scroll', onScroll);
+		};
+	});
 </script>
 
 <nav class="bottom-nav" aria-label="Navigasi utama">
 	<ul>
 		{#each items as { id, label, Icon }}
 			<li>
-				<a href="#{id}">
+				<a href="#{id}" class:active={active === id} aria-current={active === id ? 'page' : undefined}>
 					<span class="ic"><Icon size={19} /></span>
 					<span class="lbl">{label}</span>
 				</a>
@@ -45,25 +77,41 @@
 		backdrop-filter: blur(14px);
 		border: 1px solid var(--line);
 		border-radius: 999px;
-		box-shadow: 0 12px 36px rgba(35, 52, 26, 0.22);
+		box-shadow: 0 12px 36px rgba(0, 0, 0, 0.12);
 	}
 
 	.bottom-nav a {
+		position: relative;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		gap: 0.14rem;
 		text-decoration: none;
-		color: var(--ink-2);
-		padding: 0.4rem 0.55rem;
+		color: var(--ink-3);
+		padding: 0.45rem 0.65rem;
 		border-radius: 999px;
-		transition: color 0.25s ease, background 0.25s ease, transform 0.2s ease;
+		transition: all 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
 		min-width: 52px;
 	}
 
-	.bottom-nav a:hover,
-	.bottom-nav a:focus-visible {
-		color: var(--green-700);
+	.bottom-nav a.active {
+		color: #ffffff;
+		background: var(--ink);
+		box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+	}
+
+	.bottom-nav a.active .lbl {
+		color: #ffffff;
+		font-weight: 600;
+	}
+
+	.bottom-nav a.active .ic {
+		transform: scale(1.08);
+	}
+
+	.bottom-nav a:not(.active):hover,
+	.bottom-nav a:not(.active):focus-visible {
+		color: var(--ink);
 		background: var(--green-100);
 	}
 
@@ -74,6 +122,7 @@
 	.ic {
 		display: grid;
 		place-items: center;
+		transition: transform 0.22s ease;
 	}
 
 	.lbl {
@@ -81,6 +130,7 @@
 		font-weight: 500;
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
+		transition: color 0.22s ease;
 	}
 
 	@media (min-width: 720px) {

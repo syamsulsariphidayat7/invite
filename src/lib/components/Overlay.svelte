@@ -23,7 +23,7 @@
 			<span class="amp">&</span>
 			<span>{names[1]}</span>
 		</h1>
-		<p class="date">{wedding.akad.dayLabel}</p>
+		<p class="date">{wedding.resepsi.dayLabel}</p>
 
 		<Ornament tone="light" />
 
@@ -74,8 +74,8 @@
 		position: absolute;
 		inset: 0;
 		background:
-			radial-gradient(120% 90% at 50% 10%, rgba(35, 52, 26, 0.35), rgba(18, 26, 13, 0.86) 75%),
-			linear-gradient(180deg, rgba(20, 28, 15, 0.55), rgba(13, 19, 10, 0.92));
+			radial-gradient(120% 90% at 50% 10%, rgba(107, 107, 107, 0.35), rgba(43, 43, 43, 0.86) 75%),
+			linear-gradient(180deg, rgba(30, 23, 14, 0.55), rgba(20, 15, 8, 0.92));
 	}
 
 	.inner {
@@ -115,10 +115,11 @@
 		gap: 0.5em;
 		flex-wrap: wrap;
 		margin: 0.4rem 0 0.2rem;
-		font-family: var(--font-script);
+		font-family: 'Great Vibes', 'Pinyon Script', cursive;
 		font-weight: 400;
-		font-size: clamp(44px, 14vw, 72px);
-		line-height: 1.1;
+		font-size: clamp(48px, 14vw, 78px);
+		line-height: 1;
+		letter-spacing: 0.02em;
 		color: #fff;
 		text-shadow: 0 4px 30px rgba(0, 0, 0, 0.35);
 	}

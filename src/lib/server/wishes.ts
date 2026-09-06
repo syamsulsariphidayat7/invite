@@ -12,9 +12,10 @@ export interface NewWish {
 	name: string;
 	attendance: 'hadir' | 'tidak' | '';
 	message: string;
+	guests: number;
 }
 
-type Row = { id: number; name: string; attendance: string; message: string; created_at: string | Date };
+type Row = { id: number; name: string; attendance: string; message: string; guests: number; created_at: string | Date };
 
 let inMemory: Wish[] = [];
 let seq = 1;
@@ -28,6 +29,7 @@ function rowToWish(r: Row): Wish {
 		name: r.name,
 		attendance: r.attendance === 'hadir' || r.attendance === 'tidak' ? r.attendance : '',
 		message: r.message,
+		guests: Number(r.guests) || (r.attendance === 'hadir' ? 1 : 0),
 		createdAt: raw
 	};
 }
@@ -49,9 +51,11 @@ async function init(): Promise<boolean> {
 					name TEXT NOT NULL,
 					attendance TEXT NOT NULL DEFAULT '',
 					message TEXT NOT NULL,
+					guests INT NOT NULL DEFAULT 0,
 					created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 				)
 			`;
+			await sql`ALTER TABLE guest_wishes ADD COLUMN IF NOT EXISTS guests INT NOT NULL DEFAULT 0`;
 			hasDb = true;
 		})();
 	}
@@ -73,7 +77,7 @@ export async function listWishes(weddingSlug: string, limit = 30): Promise<Wish[
 	try {
 		const sql = neon(env.DATABASE_URL!);
 			const rows = (await sql`
-				SELECT id, name, attendance, message, created_at
+				SELECT id, name, attendance, message, guests, created_at
 				FROM guest_wishes
 				WHERE wedding = ${weddingSlug}
 				ORDER BY created_at DESC
@@ -93,6 +97,7 @@ export async function addWish(weddingSlug: string, input: NewWish): Promise<Wish
 		name: input.name.trim(),
 		attendance: input.attendance,
 		message: input.message.trim(),
+		guests: input.attendance === 'hadir' ? Math.max(1, Math.min(10, Math.floor(input.guests) || 1)) : 0,
 		createdAt: new Date().toISOString()
 	};
 	if (!(await init())) {
@@ -102,11 +107,11 @@ export async function addWish(weddingSlug: string, input: NewWish): Promise<Wish
 	}
 	try {
 		const sql = neon(env.DATABASE_URL!);
-			const rows = (await sql`
-				INSERT INTO guest_wishes (wedding, name, attendance, message)
-				VALUES (${weddingSlug}, ${wish.name}, ${wish.attendance}, ${wish.message})
-				RETURNING id, name, attendance, message, created_at
-			`) as unknown as Row[];
+		const rows = (await sql`
+			INSERT INTO guest_wishes (wedding, name, attendance, message, guests)
+			VALUES (${weddingSlug}, ${wish.name}, ${wish.attendance}, ${wish.message}, ${wish.guests})
+			RETURNING id, name, attendance, message, guests, created_at
+		`) as unknown as Row[];
 			return rowToWish(rows[0]);
 		} catch (e) {
 			console.error('[wishes] Gagal menyimpan ke database:', e);

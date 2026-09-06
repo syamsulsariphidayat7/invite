@@ -3,6 +3,7 @@
 	import { wedding } from '$lib/data/wedding';
 	import Photo from './Photo.svelte';
 	import SocialIcon from './SocialIcon.svelte';
+	import BatikTexture from './BatikTexture.svelte';
 
 	const bases = wedding.photos.gallery;
 	let active = $state<number | null>(null);
@@ -34,6 +35,7 @@
 </script>
 
 <section id="gallery" class="gallery" aria-label="Galeri foto">
+	<BatikTexture variant="light" opacity={0.05} size={210} />
 	<div class="wrap">
 		<!-- Blok ajakan filter Instagram (disembunyikan jika kosong) -->
 		{#if wedding.instagramFilterUrl}
@@ -98,8 +100,16 @@
 
 <style>
 	.gallery {
+		position: relative;
+		isolation: isolate;
 		padding: 5rem 0;
 		background: var(--paper);
+		overflow: hidden;
+	}
+
+	.gallery > :not(.batik):not(.lightbox) {
+		position: relative;
+		z-index: 1;
 	}
 
 	.lead {

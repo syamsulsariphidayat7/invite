@@ -1,18 +1,20 @@
 <script lang="ts">
 	import { wedding } from '$lib/data/wedding';
 	import Ornament from './Ornament.svelte';
+	import BatikTexture from './BatikTexture.svelte';
 </script>
 
 <section class="verse" aria-label="Ayat Al-Qur'an">
+	<BatikTexture variant="dark" opacity={0.14} size={220} />
 	<div class="pattern" aria-hidden="true"></div>
 	<div class="wrap">
 		<Ornament tone="light" />
 
-		<blockquote data-reveal>
-			<p class="arabic" lang="ar" dir="rtl">{wedding.verse.arabic}</p>
-			<p class="orn-symbol" aria-hidden="true">❁</p>
-			<p class="translation">“{wedding.verse.translation}”</p>
-			<footer class="source">{wedding.verse.source}</footer>
+		<blockquote>
+			<p class="arabic" lang="ar" dir="rtl" data-reveal>{wedding.verse.arabic}</p>
+			<p class="orn-symbol" aria-hidden="true" data-reveal style="--d:.1s">❁</p>
+			<p class="translation" data-reveal style="--d:.18s">“{wedding.verse.translation}”</p>
+			<footer class="source" data-reveal style="--d:.26s">{wedding.verse.source}</footer>
 		</blockquote>
 
 		<Ornament tone="light" />
@@ -22,11 +24,13 @@
 <style>
 	.verse {
 		position: relative;
+		isolation: isolate;
 		padding: 5.5rem 0;
+		overflow: hidden;
 		background:
-			radial-gradient(80% 60% at 50% 0%, rgba(116, 154, 85, 0.18), transparent 70%),
+			radial-gradient(80% 60% at 50% 0%, rgba(107, 107, 107, 0.18), transparent 70%),
 			linear-gradient(160deg, var(--green-800), var(--green-900) 65%);
-		color: #f2ecd9;
+		color: #ededed;
 		overflow: hidden;
 	}
 
@@ -47,11 +51,16 @@
 	}
 
 	.arabic {
-		margin: 0;
-		font-family: 'Amiri', 'Scheherazade New', 'Traditional Arabic', serif;
-		font-size: clamp(22px, 6.5vw, 32px);
-		line-height: 2.1;
+		margin: 0 auto;
+		max-width: 22em;
+		font-family: 'Amiri Quran', 'Noto Naskh Arabic', 'Amiri', serif;
+		font-size: clamp(20px, 5.5vw, 28px);
+		line-height: 1.9;
+		letter-spacing: 0.02em;
 		color: #fff;
+		text-wrap: balance;
+		white-space: normal;
+		overflow-wrap: break-word;
 	}
 
 	.orn-symbol {
@@ -67,7 +76,7 @@
 		font-style: italic;
 		font-size: 16.5px;
 		line-height: 1.95;
-		color: rgba(242, 236, 217, 0.95);
+		color: rgba(237, 237, 237, 0.95);
 	}
 
 	.source {
@@ -80,5 +89,10 @@
 
 	.verse :global(.orn) {
 		opacity: 0.9;
+	}
+
+	.verse .wrap {
+		position: relative;
+		z-index: 1;
 	}
 </style>

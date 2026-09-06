@@ -2,19 +2,35 @@
 	import { Send, CheckCircle2, AlertCircle, PartyPopper } from 'lucide-svelte';
 	import { wedding } from '$lib/data/wedding';
 	import Ornament from './Ornament.svelte';
+	import BatikTexture from './BatikTexture.svelte';
 	import type { Wish } from '$lib/data/wedding';
 
 	let {
 		initialWishes = [],
-		initialTotal = 0
-	}: { initialWishes?: Wish[]; initialTotal?: number } = $props();
+		initialTotal = 0,
+		guestName = ''
+	}: { initialWishes?: Wish[]; initialTotal?: number; guestName?: string } = $props();
 
 	let wishes = $state<Wish[]>(initialWishes);
 	let total = $state(initialTotal);
+	let page = $state(1);
+	const perPage = 3;
+	let totalPages = $derived(Math.max(1, Math.ceil(wishes.length / perPage)));
+	let visible = $derived(wishes.slice((page - 1) * perPage, page * perPage));
 
-	let name = $state('');
+	let name = $state(guestName || '');
 	let attendance = $state<'' | 'hadir' | 'tidak'>('');
+	let guests = $state(1);
 	let message = $state('');
+
+	$effect(() => {
+		if (guestName && !name) name = guestName;
+	});
+	$effect(() => {
+		void wishes.length;
+		if (page > totalPages) page = totalPages;
+		if (page < 1) page = 1;
+	});
 	let busy = $state(false);
 	let status = $state<{ kind: 'idle' | 'error' | 'ok'; text: string }>({ kind: 'idle', text: '' });
 
@@ -30,6 +46,8 @@
 		if (name.trim().length < wedding.wishes.minName) return `Nama minimal ${wedding.wishes.minName} karakter.`;
 		if (attendance !== 'hadir' && attendance !== 'tidak')
 			return 'Silakan pilih konfirmasi kehadiran terlebih dahulu.';
+		if (attendance === 'hadir' && (guests < 1 || guests > 10))
+			return 'Jumlah kehadiran 1-10 orang.';
 		if (message.trim().length < wedding.wishes.minMessage)
 			return `Ucapan minimal ${wedding.wishes.minMessage} karakter.`;
 		return null;
@@ -47,7 +65,7 @@
 			const res = await fetch('/api/wishes', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ name: name.trim(), attendance, message: message.trim() })
+				body: JSON.stringify({ name: name.trim(), attendance, message: message.trim(), guests: attendance === 'hadir' ? guests : 0 })
 			});
 			const data = await res.json();
 			if (!res.ok) {
@@ -56,8 +74,10 @@
 			}
 			wishes = [data.wish, ...wishes];
 			total += 1;
+			page = 1;
 			name = '';
 			attendance = '';
+			guests = 1;
 			message = '';
 			status = { kind: 'ok', text: 'Terima kasih atas doa & ucapannya 🙏' };
 		} catch {
@@ -69,117 +89,140 @@
 </script>
 
 <section id="wishes" class="wishes" aria-label="Ucapan dan doa">
+	<BatikTexture variant="light" opacity={0.05} size={220} />
 	<div class="wrap">
 		<p class="kicker" data-reveal>~ Best Wishes ~</p>
 		<h2 class="section-title" data-reveal style="--d:.06s">Kirim Ucapan & Doa</h2>
 		<Ornament tone="green" />
+
+		<form class="form" data-reveal onsubmit={(e) => { e.preventDefault(); submit(); }}>
+			<p class="note">* {wedding.wishes.note} *<br />Minimal {wedding.wishes.minMessage} karakter.</p>
+
+			<label>
+				<span>Nama</span>
+				<input
+					type="text"
+					bind:value={name}
+					maxlength="120"
+					placeholder="Nama kamu"
+					autocomplete="name"
+				/>
+			</label>
+
+			<fieldset>
+				<legend>Konfirmasi Kehadiran</legend>
+				<div class="attend">
+					<button
+						type="button"
+						class:on={attendance === 'hadir'}
+						class="attend-btn hadir"
+						aria-pressed={attendance === 'hadir'}
+						onclick={() => (attendance = 'hadir')}
+					>
+						Hadir
+					</button>
+					<button
+						type="button"
+						class:on={attendance === 'tidak'}
+						class="attend-btn tidak"
+						aria-pressed={attendance === 'tidak'}
+						onclick={() => (attendance = 'tidak')}
+					>
+						Tidak Hadir
+					</button>
+				</div>
+				</fieldset>
+
+			{#if attendance === 'hadir'}
+				<label>
+					<span>Jumlah Kehadiran</span>
+					<div class="counter-input">
+						<button type="button" class="step" onclick={() => (guests = Math.max(1, guests - 1))} aria-label="Kurangi">−</button>
+						<span class="count">{guests} Orang</span>
+						<button type="button" class="step" onclick={() => (guests = Math.min(10, guests + 1))} aria-label="Tambah">+</button>
+					</div>
+				</label>
+			{/if}
+
+			<label>
+				<span>Ucapan & Doa</span>
+				<textarea
+					bind:value={message}
+					rows="4"
+					maxlength="1000"
+					placeholder="Tulis ucapan dan doa restu untuk kami…"
+				></textarea>
+			</label>
+
+			{#if status.kind === 'error'}
+				<p class="msg error"><AlertCircle size={14} /> {status.text}</p>
+			{:else if status.kind === 'ok'}
+				<p class="msg ok"><CheckCircle2 size={14} /> {status.text}</p>
+			{/if}
+
+			<button class="btn btn-green submit" type="submit" disabled={busy}>
+				<Send size={15} />
+				{busy ? 'Mengirim…' : 'Kirim Ucapan'}
+			</button>
+		</form>
 
 		<div class="counter" data-reveal style="--d:.1s">
 			<PartyPopper size={14} />
 			{total} Ucapan
 		</div>
 
-		<div class="cols">
-			<!-- ============ FORM ============ -->
-			<form class="form" data-reveal onsubmit={(e) => { e.preventDefault(); submit(); }}>
-				<p class="note">* {wedding.wishes.note} *<br />Minimal {wedding.wishes.minMessage} karakter.</p>
-
-				<label>
-					<span>Nama</span>
-					<input
-						type="text"
-						bind:value={name}
-						maxlength="120"
-						placeholder="Nama kamu"
-						autocomplete="name"
-					/>
-				</label>
-
-				<fieldset>
-					<legend>Konfirmasi Kehadiran</legend>
-					<div class="attend">
-						<button
-							type="button"
-							class:on={attendance === 'hadir'}
-							class="attend-btn hadir"
-							aria-pressed={attendance === 'hadir'}
-							onclick={() => (attendance = 'hadir')}
-						>
-							Hadir
-						</button>
-						<button
-							type="button"
-							class:on={attendance === 'tidak'}
-							class="attend-btn tidak"
-							aria-pressed={attendance === 'tidak'}
-							onclick={() => (attendance = 'tidak')}
-						>
-							Tidak Hadir
-						</button>
+		<div class="list" data-reveal style="--d:.12s">
+			{#if wishes.length === 0}
+				<p class="empty">Belum ada ucapan. Jadilah yang pertama memberikan doa terbaik 🕊️</p>
+			{:else}
+				{#each visible as w}
+					<article class="wish">
+						<span class="avatar" style="--hue:{(w.name.charCodeAt(0) * 47) % 360}">
+							{w.name.trim().charAt(0).toUpperCase()}
+						</span>
+						<div class="body">
+							<header>
+								<strong>{w.name}</strong>
+								<span class="chip" class:hadir={w.attendance === 'hadir'}>
+									{w.attendance === 'hadir' ? `Hadir · ${w.guests ?? 1} Orang` : 'Tidak Hadir'}
+								</span>
+								<time datetime={w.createdAt}>{fmt.format(new Date(w.createdAt))}</time>
+							</header>
+							<p class="text">{w.message}</p>
+						</div>
+					</article>
+				{/each}
+				{#if totalPages > 1}
+					<div class="pagination">
+						<button type="button" class="page-btn" disabled={page <= 1} onclick={() => (page -= 1)}>‹ Sebelumnya</button>
+						<span class="page-info">{page} / {totalPages}</span>
+						<button type="button" class="page-btn" disabled={page >= totalPages} onclick={() => (page += 1)}>Berikutnya ›</button>
 					</div>
-				</fieldset>
-
-				<label>
-					<span>Ucapan & Doa</span>
-					<textarea
-						bind:value={message}
-						rows="4"
-						maxlength="1000"
-						placeholder="Tulis ucapan dan doa restu untuk kami…"
-					></textarea>
-				</label>
-
-				{#if status.kind === 'error'}
-					<p class="msg error"><AlertCircle size={14} /> {status.text}</p>
-				{:else if status.kind === 'ok'}
-					<p class="msg ok"><CheckCircle2 size={14} /> {status.text}</p>
 				{/if}
-
-				<button class="btn btn-green submit" type="submit" disabled={busy}>
-					<Send size={15} />
-					{busy ? 'Mengirim…' : 'Kirim Ucapan'}
-				</button>
-			</form>
-
-			<!-- ============ DAFTAR ============ -->
-			<div class="list" data-reveal style="--d:.12s">
-				{#if wishes.length === 0}
-					<p class="empty">Belum ada ucapan. Jadilah yang pertama memberikan doa terbaik 🕊️</p>
-				{:else}
-					{#each wishes as w}
-						<article class="wish">
-							<span class="avatar" style="--hue:{(w.name.charCodeAt(0) * 47) % 360}">
-								{w.name.trim().charAt(0).toUpperCase()}
-							</span>
-							<div class="body">
-								<header>
-									<strong>{w.name}</strong>
-									<span class="chip" class:hadir={w.attendance === 'hadir'}>
-										{w.attendance === 'hadir' ? 'Hadir' : 'Tidak Hadir'}
-									</span>
-									<time datetime={w.createdAt}>{fmt.format(new Date(w.createdAt))}</time>
-								</header>
-								<p class="text">{w.message}</p>
-							</div>
-						</article>
-					{/each}
-				{/if}
-			</div>
+			{/if}
 		</div>
 	</div>
 </section>
 
 <style>
 	.wishes {
+		position: relative;
+		isolation: isolate;
 		padding: 5.5rem 0;
 		background: var(--paper);
+		overflow: hidden;
+	}
+
+	.wishes > :not(.batik) {
+		position: relative;
+		z-index: 1;
 	}
 
 	.counter {
 		display: flex;
 		align-items: center;
 		gap: 0.45em;
-		margin: 0 auto 2.4rem;
+		margin: 2.2rem auto 1.2rem;
 		background: var(--green-100);
 		color: var(--green-700);
 		font-size: 13px;
@@ -187,19 +230,6 @@
 		border-radius: 999px;
 		padding: 0.45em 1.2em;
 		width: fit-content;
-	}
-
-	.cols {
-		display: grid;
-		gap: 2.6rem;
-	}
-
-	@media (min-width: 900px) {
-		.cols {
-			grid-template-columns: 380px 1fr;
-			gap: 3rem;
-			align-items: start;
-		}
 	}
 
 	/* form */
@@ -237,7 +267,7 @@
 		width: 100%;
 		border: 1px solid var(--line);
 		border-radius: 12px;
-		background: #fffdf9;
+		background: #ffffff;
 		padding: 0.75em 1em;
 		font-family: var(--font-body);
 		font-size: 14.5px;
@@ -250,7 +280,7 @@
 	.form textarea:focus {
 		outline: none;
 		border-color: var(--gold-2);
-		box-shadow: 0 0 0 3px rgba(197, 178, 151, 0.22);
+		box-shadow: 0 0 0 3px rgba(107, 107, 107, 0.18);
 	}
 
 	.form fieldset {
@@ -267,7 +297,7 @@
 
 	.attend-btn {
 		border: 1px solid var(--line);
-		background: #fffdf9;
+		background: #ffffff;
 		color: var(--ink-2);
 		border-radius: 999px;
 		padding: 0.65em 0.5em;
@@ -286,8 +316,38 @@
 	.attend-btn.tidak.on {
 		background: var(--rose-100);
 		border-color: var(--rose);
-		color: #a56a76;
+		color: #6b6b6b;
 		font-weight: 600;
+	}
+
+	.counter-input {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		border: 1px solid var(--line);
+		border-radius: 999px;
+		background: #fff;
+		padding: 0.35rem;
+	}
+
+	.counter-input .count {
+		font-size: 14px;
+		font-weight: 600;
+		color: var(--ink);
+	}
+
+	.counter-input .step {
+		width: 36px;
+		height: 36px;
+		border-radius: 50%;
+		border: 1px solid var(--line);
+		background: var(--paper);
+		color: var(--ink);
+		font-size: 18px;
+		line-height: 1;
+		cursor: pointer;
+		display: grid;
+		place-items: center;
 	}
 
 	.msg {
@@ -302,7 +362,7 @@
 
 	.msg.error {
 		background: var(--rose-100);
-		color: #a04352;
+		color: #6b6b6b;
 	}
 
 	.msg.ok {
@@ -319,13 +379,38 @@
 		cursor: default;
 	}
 
+	.pagination {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.8rem;
+		margin-top: 0.4rem;
+	}
+
+	.page-btn {
+		border: 1px solid var(--line);
+		background: #fff;
+		color: var(--ink-2);
+		border-radius: 999px;
+		padding: 0.45em 1em;
+		font-size: 12.5px;
+		cursor: pointer;
+	}
+
+	.page-btn:disabled {
+		opacity: 0.45;
+		cursor: default;
+	}
+
+	.page-info {
+		font-size: 12px;
+		color: var(--ink-3);
+	}
+
 	/* daftar ucapan */
 	.list {
 		display: grid;
 		gap: 1rem;
-		max-height: 640px;
-		overflow-y: auto;
-		padding-right: 0.3rem;
 	}
 
 	.empty {
@@ -389,7 +474,7 @@
 		border-radius: 999px;
 		padding: 0.15em 0.7em;
 		background: var(--rose-100);
-		color: #a56a76;
+		color: #6b6b6b;
 	}
 
 	.chip.hadir {

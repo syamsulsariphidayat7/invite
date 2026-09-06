@@ -3,10 +3,14 @@
 	import { onMount } from 'svelte';
 	import { wedding } from '$lib/data/wedding';
 	import Ornament from './Ornament.svelte';
+	import BatikTexture from './BatikTexture.svelte';
 
-	const target = new Date(wedding.akad.dateISO).getTime();
+	const showAkad = false;
+	const target = new Date((showAkad ? wedding.akad : wedding.resepsi).dateISO).getTime();
 
 	let left = $state({ d: 0, h: 0, m: 0, s: 0 });
+	let countdownRef: HTMLDivElement | null = $state(null);
+	let topVisible = $state(false);
 
 	onMount(() => {
 		const tick = () => {
@@ -20,7 +24,16 @@
 		};
 		tick();
 		const t = setInterval(tick, 1000);
-		return () => clearInterval(t);
+		const onScroll = () => {
+			if (!countdownRef) return;
+			topVisible = countdownRef.getBoundingClientRect().bottom < 8;
+		};
+		window.addEventListener('scroll', onScroll, { passive: true });
+		onScroll();
+		return () => {
+			clearInterval(t);
+			window.removeEventListener('scroll', onScroll);
+		};
 	});
 
 	const units = $derived([
@@ -32,27 +45,28 @@
 
 	const pad = (n: number) => String(n).padStart(2, '0');
 
-	const events = [
-		{
-			...wedding.akad,
-			icon: 'akad'
-		},
-		{
-			...wedding.resepsi,
-			icon: 'resepsi'
-		}
-	];
+	const events = (showAkad ? [wedding.akad, wedding.resepsi] : [wedding.resepsi]).map((e) => ({
+		...e,
+		icon: e === wedding.akad ? 'akad' : 'resepsi'
+	}));
 </script>
 
 <section id="event" class="events" aria-label="Jadwal acara">
+	<BatikTexture variant="light" opacity={0.055} size={220} />
+	<div class="top-countdown" class:show={topVisible} aria-hidden={!topVisible}>
+		{#each units as u}
+			<span class="tc-unit"><b>{pad(u.value)}</b><i>{u.label.slice(0, 3)}</i></span>
+			{#if u !== units[units.length - 1]}<span class="tc-sep">:</span>{/if}
+		{/each}
+	</div>
 	<!-- ============ COUNTDOWN ============ -->
-	<div class="countdown-block wrap">
+	<div class="countdown-block wrap" bind:this={countdownRef}>
 		<p class="kicker" data-reveal>Wedding Event</p>
 		<h2 class="section-title" data-reveal style="--d:.06s">Our Special Wedding Event</h2>
 		<p class="lead" data-reveal style="--d:.12s">
 			Mohon doa & restunya untuk acara yang akan diselenggarakan pada:
 		</p>
-		<p class="big-date" data-reveal style="--d:.18s">{wedding.akad.dayLabel}</p>
+		<p class="big-date" data-reveal style="--d:.18s">{(showAkad ? wedding.akad : wedding.resepsi).dayLabel}</p>
 
 		<div class="countdown" data-reveal style="--d:.24s">
 			{#each units as u}
@@ -66,7 +80,7 @@
 	</div>
 
 	<!-- ============ KARTU ACARA ============ -->
-	<div class="cards wrap">
+	<div class="cards wrap" class:single={events.length === 1}>
 		{#each events as ev, i}
 			<article class="card" data-reveal style="--d:{i * 0.1}s">
 				<Ornament tone="green" />
@@ -97,9 +111,76 @@
 
 <style>
 	.events {
+		position: relative;
+		isolation: isolate;
 		padding: 5rem 0 4.5rem;
-		background:
-			linear-gradient(180deg, var(--paper) 0%, var(--paper-2) 30%);
+		background: linear-gradient(180deg, var(--paper) 0%, var(--paper-2) 30%);
+		overflow: hidden;
+	}
+
+	.events > :not(.batik) {
+		position: relative;
+		z-index: 1;
+	}
+
+	.top-countdown {
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		z-index: 40;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.35rem;
+		padding: 0.55rem 1rem calc(0.55rem + env(safe-area-inset-top, 0px));
+		padding-top: calc(0.55rem + env(safe-area-inset-top, 0px));
+		background: rgba(245, 245, 245, 0.92);
+		backdrop-filter: blur(12px);
+		-webkit-backdrop-filter: blur(12px);
+		border-bottom: 1px solid var(--line-soft);
+		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+		transform: translateY(-100%);
+		opacity: 0;
+		pointer-events: none;
+		transition: transform 0.28s ease, opacity 0.22s ease;
+	}
+
+	.top-countdown.show {
+		transform: translateY(0);
+		opacity: 1;
+		pointer-events: auto;
+	}
+
+	.tc-unit {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 0.22em;
+		font-size: 12.5px;
+		color: var(--ink-2);
+	}
+
+	.tc-unit b {
+		font-family: var(--font-display);
+		font-weight: 400;
+		font-size: 17px;
+		color: var(--ink);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.tc-unit i {
+		font-style: normal;
+		font-size: 10px;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--ink-3);
+	}
+
+	.tc-sep {
+		font-family: var(--font-display);
+		color: var(--gold-3);
+		font-size: 13px;
+		margin: 0 0.05rem;
 	}
 
 	.countdown-block {
@@ -169,8 +250,13 @@
 		margin-top: 3.5rem;
 	}
 
+	.cards.single {
+		max-width: 520px;
+		margin-inline: auto;
+	}
+
 	@media (min-width: 820px) {
-		.cards {
+		.cards:not(.single) {
 			grid-template-columns: 1fr 1fr;
 			gap: 2rem;
 			width: min(100% - 3rem, 860px);

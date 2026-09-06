@@ -1,12 +1,13 @@
 <script lang="ts">
 	import { wedding } from '$lib/data/wedding';
 	import Ornament from './Ornament.svelte';
+	import BatikTexture from './BatikTexture.svelte';
 
 	const chapters = wedding.story.chapters;
-	const numerals = ['I', 'II', 'III', 'IV', 'V'];
 </script>
 
 <section class="story" aria-label="Kisah cinta kami">
+	<BatikTexture variant="light" opacity={0.058} size={240} />
 	<div class="wrap">
 		<p class="kicker" data-reveal>Love Story</p>
 		<h2 class="section-title" data-reveal style="--d:.06s">The Memorable Moments</h2>
@@ -17,7 +18,11 @@
 	<div class="timeline wrap-wide">
 		{#each chapters as ch, i}
 			<article class="chapter" data-reveal style="--d:{i * 0.08}s">
-				<span class="node" aria-hidden="true">{numerals[i % numerals.length]}</span>
+				<span class="node" aria-hidden="true">
+					<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
+						<path d="M12 21s-6.2-3.9-8.6-8.1C1.9 9.6 3.1 5.4 6.7 4.2c2-.7 4.1.1 5.3 1.7C13.2 4.3 15.3 3.5 17.3 4.2c3.6 1.2 4.8 5.4 3.3 8.7C18.2 17.1 12 21 12 21z" />
+					</svg>
+				</span>
 				<div class="card">
 					<h3 class="chapter-title">{ch.title}</h3>
 					<p class="chapter-text">{ch.text}</p>
@@ -29,9 +34,16 @@
 
 <style>
 	.story {
+		position: relative;
+		isolation: isolate;
 		padding: 5.5rem 0;
-		background:
-			linear-gradient(180deg, var(--paper-2), var(--paper) 60%);
+		background: linear-gradient(180deg, var(--paper-2), var(--paper) 60%);
+		overflow: hidden;
+	}
+
+	.story > :not(.batik) {
+		position: relative;
+		z-index: 1;
 	}
 
 	:global(.story .wrap .orn) {

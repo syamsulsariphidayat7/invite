@@ -1,5 +1,3 @@
-// Pemutar musik latar gaya "YouTube audio" (mirip plugin referensi):
-// iframe YouTube tersembunyi, mulai dari detik ke-N, bisa di-toggle play/pause.
 import { writable } from 'svelte/store';
 import { wedding } from '$lib/data/wedding';
 
@@ -8,8 +6,12 @@ export const musicState = writable<{ started: boolean; playing: boolean }>({
 	playing: false
 });
 
-const id = wedding.music.youtubeId;
+const src = (wedding.music as { src?: string }).src || '';
+const ytId = wedding.music.youtubeId;
 const startAt = wedding.music.startSeconds || 0;
+
+let audio: HTMLAudioElement | null = null;
+let bootQueued = false;
 
 interface PlayerLike {
 	playVideo: () => void;
@@ -17,8 +19,7 @@ interface PlayerLike {
 	seekTo: (s: number) => void;
 }
 
-let player: PlayerLike | null = null;
-let bootQueued = false;
+let ytPlayer: PlayerLike | null = null;
 let apiReady: Promise<void> | null = null;
 
 declare global {
@@ -30,6 +31,20 @@ declare global {
 
 function setPlaying(playing: boolean) {
 	musicState.update((s) => ({ ...s, started: true, playing }));
+}
+
+function ensureAudio(): HTMLAudioElement | null {
+	if (typeof window === 'undefined') return null;
+	if (audio) return audio;
+	if (!src) return null;
+	audio = new Audio(src);
+	audio.loop = true;
+	audio.preload = 'auto';
+	audio.crossOrigin = 'anonymous';
+	audio.addEventListener('play', () => setPlaying(true));
+	audio.addEventListener('pause', () => setPlaying(false));
+	audio.addEventListener('ended', () => setPlaying(false));
+	return audio;
 }
 
 function loadApi(): Promise<void> {
@@ -47,28 +62,22 @@ function loadApi(): Promise<void> {
 	return apiReady;
 }
 
-async function boot() {
+async function bootYT() {
 	if (bootQueued) return;
 	bootQueued = true;
 	await loadApi();
-	if (!id) return;
-
+	if (!ytId) return;
 	const YT = window.YT as {
-		Player: new (
-			el: string | HTMLElement,
-			opts: Record<string, unknown>
-		) => PlayerLike;
+		Player: new (el: string | HTMLElement, opts: Record<string, unknown>) => PlayerLike;
 	};
-
 	const container = document.createElement('div');
 	container.id = 'youtube-audio';
 	container.style.cssText = 'position:fixed;width:0;height:0;opacity:0;pointer-events:none;';
 	document.body.appendChild(container);
-
-	player = new YT.Player('youtube-audio', {
+	ytPlayer = new YT.Player('youtube-audio', {
 		width: '0',
 		height: '0',
-		videoId: id,
+		videoId: ytId,
 		playerVars: {
 			autoplay: 0,
 			controls: 0,
@@ -77,7 +86,7 @@ async function boot() {
 			playsinline: 1,
 			rel: 0,
 			loop: 1,
-			playlist: id
+			playlist: ytId
 		},
 		events: {
 			onReady: (e: { target: PlayerLike }) => {
@@ -85,30 +94,54 @@ async function boot() {
 				e.target.playVideo();
 			},
 			onStateChange: (e: { data: number }) => {
-				// 1 = playing, 2 = paused, 0 = ended (playlist loop menangani ulang)
 				if (e.data === 1 || e.data === 2) setPlaying(e.data === 1);
 			}
 		}
 	});
 }
 
-/** Dipanggil saat tamu menekan "Buka Undangan". */
 export async function startMusic() {
-	if (!id || typeof window === 'undefined') return;
-	if (!bootQueued) await boot();
-	player?.playVideo();
+	if (typeof window === 'undefined') return;
+	if (src) {
+		const a = ensureAudio();
+		if (!a) return;
+		try {
+			if (a.currentTime < startAt || a.currentTime === 0) {
+				a.currentTime = startAt;
+			}
+			await a.play();
+		} catch {}
+		return;
+	}
+	if (!ytId) return;
+	if (!bootQueued) await bootYT();
+	ytPlayer?.playVideo();
 }
 
 export async function toggleMusic() {
-	if (!id || typeof window === 'undefined') return;
+	if (typeof window === 'undefined') return;
+	if (src) {
+		const a = ensureAudio();
+		if (!a) return;
+		if (a.paused) {
+			try {
+				if (a.currentTime === 0 && startAt) a.currentTime = startAt;
+				await a.play();
+			} catch {}
+		} else {
+			a.pause();
+		}
+		return;
+	}
+	if (!ytId) return;
 	if (!bootQueued) {
-		await boot();
-		player?.playVideo();
+		await bootYT();
+		ytPlayer?.playVideo();
 		return;
 	}
 	let playing = false;
 	const unsub = musicState.subscribe((s) => (playing = s.playing));
 	unsub();
-	if (playing) player?.pauseVideo();
-	else player?.playVideo();
+	if (playing) ytPlayer?.pauseVideo();
+	else ytPlayer?.playVideo();
 }

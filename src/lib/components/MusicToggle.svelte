@@ -3,7 +3,7 @@
 	import { wedding } from '$lib/data/wedding';
 	import { musicState, toggleMusic } from '$lib/music.svelte';
 
-	const enabled = !!wedding.music.youtubeId;
+	const enabled = !!((wedding.music as { src?: string }).src || wedding.music.youtubeId);
 	let state = $state({ started: false, playing: false });
 	musicState.subscribe((s) => (state = s));
 </script>
@@ -39,7 +39,7 @@
 		place-items: center;
 		background: linear-gradient(135deg, var(--green-700), var(--green-900));
 		color: #fff;
-		box-shadow: 0 10px 26px rgba(35, 52, 26, 0.4);
+		box-shadow: 0 10px 26px rgba(0, 0, 0, 0.22);
 		transition: transform 0.25s ease;
 	}
 

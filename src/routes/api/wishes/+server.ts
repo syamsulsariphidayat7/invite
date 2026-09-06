@@ -18,10 +18,11 @@ export async function POST({ request }) {
 		error(400, 'Format data tidak valid.');
 	}
 
-	const { name, attendance, message } = (body ?? {}) as {
+	const { name, attendance, message, guests } = (body ?? {}) as {
 		name?: unknown;
 		attendance?: unknown;
 		message?: unknown;
+		guests?: unknown;
 	};
 
 	if (typeof name !== 'string' || name.trim().length < wedding.wishes.minName) {
@@ -34,11 +35,20 @@ export async function POST({ request }) {
 	if (attendanceNorm !== 'hadir' && attendanceNorm !== 'tidak') {
 		error(400, 'Silakan pilih konfirmasi kehadiran.');
 	}
+	let guestsNum = 0;
+	if (attendanceNorm === 'hadir') {
+		guestsNum = typeof guests === 'number' ? guests : Number(guests);
+		if (!Number.isFinite(guestsNum) || guestsNum < 1 || guestsNum > 10) {
+			error(400, 'Jumlah kehadiran 1-10 orang.');
+		}
+		guestsNum = Math.floor(guestsNum);
+	}
 
 	const wish = await addWish(wedding.slug, {
 		name: name.trim().slice(0, 120),
 		attendance: attendanceNorm as 'hadir' | 'tidak',
-		message: message.trim().slice(0, 1000)
+		message: message.trim().slice(0, 1000),
+		guests: guestsNum
 	});
 
 	return json({ success: true, wish }, { status: 201 });

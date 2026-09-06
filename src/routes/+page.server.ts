@@ -1,7 +1,6 @@
-import { listWishes, countWishes } from '$lib/server/wishes';
+import { redirect } from '@sveltejs/kit';
 import { wedding } from '$lib/data/wedding';
 
-export const load = async () => {
-	const [wishes, total] = await Promise.all([listWishes(wedding.slug), countWishes(wedding.slug)]);
-	return { wishes, total };
+export const load = async ({ url }) => {
+	redirect(307, `/${wedding.slug}${url.search}`);
 };

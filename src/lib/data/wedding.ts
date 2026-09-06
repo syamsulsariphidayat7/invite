@@ -36,6 +36,7 @@ export interface Wish {
 	name: string;
 	attendance: 'hadir' | 'tidak' | '';
 	message: string;
+	guests: number;
 	createdAt: string;
 }
 
@@ -43,7 +44,7 @@ export const wedding = {
 	slug: 'ruhaeni-roni',
 	siteTitle: 'The Wedding of Ruhaeni & Roni',
 	metaDescription:
-		'Undangan pernikahan Ruhaeni & Roni — Akad 20 September 2026, Resepsi 21 September 2026.',
+		'Undangan pernikahan Ruhaeni & Roni — Resepsi 21 September 2026.',
 
 	// ---- Mempelai ----
 	bride: {
@@ -51,16 +52,16 @@ export const wedding = {
 		fullName: 'Ruhaeni',
 		relation: 'Putri Bungsu dari\nBapak Nuryadin & Ibu Dedeh',
 		photo: 'bride',
-		instagram: '',
+		instagram: 'https://www.instagram.com/_ruhaeni',
 		whatsapp: ''
 	} satisfies Person,
 
 	groom: {
-		name: 'Roni',
-		fullName: 'Roni',
+		name: 'Asep Roni',
+		fullName: 'Asep Roni',
 		relation: 'Putra Pertama dari\nBapak Badri & Ibu Suryati',
 		photo: 'groom',
-		instagram: '',
+		instagram: 'https://www.instagram.com/ronii_wiguna',
 		whatsapp: ''
 	} satisfies Person,
 
@@ -85,8 +86,7 @@ export const wedding = {
 	venue: {
 		name: 'Kediaman Mempelai Wanita',
 		address: 'Kp. Pasanggrahan RT 03 RW 07, Desa Karangsari, Kecamatan Pakenjeng, Kabupaten Garut',
-		mapsUrl: 'https://maps.google.com/?q=' +
-			encodeURIComponent('Kp Pasanggrahan RT 03 RW 07 Desa Karangsari Kecamatan Pakenjeng Kabupaten Garut')
+		mapsUrl: 'https://maps.app.goo.gl/TuB4MCeqsRw4Qu3L7'
 	},
 
 	// ---- Foto (nama dasar file di /static/photos, ekstensi otomatis dicoba:
@@ -109,7 +109,8 @@ export const wedding = {
 			'gallery-10',
 			'gallery-11',
 			'gallery-12'
-		]
+		],
+		heroSlides: ['hero', 'gallery-1', 'gallery-2', 'gallery-3', 'gallery-4']
 	},
 
 	// ---- Kutipan / Ayat ----
@@ -148,10 +149,9 @@ export const wedding = {
 	gift: {
 		note:
 			'Doa restu Anda merupakan karunia yang sangat berarti bagi kami. Dan jika memberi adalah ungkapan tanda kasih, Anda dapat memberi kado secara cashless.',
-		// TODO: ganti nomor rekening dengan nomor asli
 		accounts: [
-			{ bank: 'BCA', number: '1234567890', holder: 'Ruhaeni' },
-			{ bank: 'BNI', number: '0987654321', holder: 'Roni' }
+			{ bank: 'DANA', number: '085724087380', holder: 'Ruhaeni' },
+			{ bank: 'DANA', number: '085624398337', holder: 'Asep Roni' }
 		] satisfies BankAccount[]
 	},
 
@@ -163,11 +163,11 @@ export const wedding = {
 	},
 
 	// ---- Musik latar ----
-	// Isi youtubeId dengan ID lagu YouTube (bisa privat/unlisted), atau kosongkan.
-	// Saat ini: Christina Perri — A Thousand Years (video resmi).
-	// Audio mengikuti pola "mulai dari detik ke-5".
+	// Offline: file di /static/audio/wedding.mp3 → diakses sebagai /audio/wedding.mp3
+	// youtubeId opsional sebagai fallback bila src kosong.
 	music: {
-		youtubeId: 'rtOvBOTyX00',
+		src: '/audio/wedding.mp3',
+		youtubeId: '',
 		startSeconds: 5
 	},
 
@@ -182,12 +182,12 @@ export const wedding = {
 };
 
 // Alamat lengkap yang dipakai tombol "Save The Date" (Google Calendar)
-// Mulai: Akad 20 Sep 2026 08.00 WIB (= 01.00 UTC) s/d akhir Resepsi 21 Sep 2026 (14.00 UTC)
+// Resepsi 21 Sep 2026 10.00 WIB (= 03.00 UTC) s/d selesai 21.00 WIB (14.00 UTC)
 export const calendarUrl =
 	'https://calendar.google.com/calendar/render?action=TEMPLATE' +
 	`&text=${encodeURIComponent('Undangan Pernikahan Ruhaeni & Roni')}` +
-	'&dates=20260920T010000Z/20260921T140000Z' +
+	'&dates=20260921T030000Z/20260921T140000Z' +
 	`&details=${encodeURIComponent(
-		`Akad Nikah: ${wedding.akad.dayLabel}, ${wedding.akad.time}\nResepsi: ${wedding.resepsi.dayLabel}, ${wedding.resepsi.time}\n\n${wedding.venue.name}\n${wedding.venue.address}`
+		`Resepsi: ${wedding.resepsi.dayLabel}, ${wedding.resepsi.time}\n\n${wedding.venue.name}\n${wedding.venue.address}`
 	)}` +
 	`&location=${encodeURIComponent(`${wedding.venue.name}, ${wedding.venue.address}`)}`;
