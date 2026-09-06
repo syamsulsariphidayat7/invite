@@ -111,7 +111,7 @@ if (!NEON_URL) {
     created_at: w.createdAt ? new Date(w.createdAt) : new Date()
   }));
 } else {
-  const neon = postgres(NEON_URL, { prepare: false, max: 1 });
+  const neon = connect(NEON_URL, { prepare: false, max: 1 });
   try {
     rows = await neon`
       SELECT id, wedding, name, attendance, message,
@@ -125,7 +125,22 @@ if (!NEON_URL) {
 }
 console.log(`✓ Sumber: ${rows.length} ucapan diekspor`);
 
-const supa = postgres(SUPA_URL, { prepare: false, max: 3 });
+// Koneksi tahan password dengan karakter spesial: parse URL → config object
+// (driver memakai `new URL()` yang gagal bila password mengandung `?` dll.)
+function connect(url, opts) {
+  const m = url.match(/postgresql:\/\/([^:]+):(.+)@([^:/]+):(\d+)\/([^?\s]+)/);
+  if (!m) return postgres(url, opts);
+  let password = m[2];
+  try {
+    if (password.includes('%')) password = decodeURIComponent(password);
+  } catch {}
+  return postgres(
+    { user: m[1], password, host: m[3], port: Number(m[4]), database: m[5] },
+    opts
+  );
+}
+
+const supa = connect(SUPA_URL, { prepare: false, max: 3 });
 
 try {
   // B. Tabel di Supabase ------------------------------------------------------
