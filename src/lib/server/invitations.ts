@@ -1,4 +1,4 @@
-import { db } from './db';
+import { db, jsonb } from './db';
 import { env } from '$env/dynamic/private';
 
 export interface InvitationRow {
@@ -78,7 +78,7 @@ export async function createInvitation(input: {
 }): Promise<InvitationRow> {
 	const rows = (await db()`
 		INSERT INTO invitations (subdomain, nama_pihak_1, nama_pihak_2, tanggal_acara, template, data_json, status, access_pin, wa_template)
-		VALUES (${input.subdomain}, ${input.namaPihak1 ?? ''}, ${input.namaPihak2 ?? ''}, ${input.tanggalAcara ?? null}, ${input.template ?? 'classic'}, ${JSON.stringify(input.dataJson ?? {})}::jsonb, ${input.status ?? 'draft'}, ${input.accessPin ?? null}, ${input.waTemplate ?? null})
+		VALUES (${input.subdomain}, ${input.namaPihak1 ?? ''}, ${input.namaPihak2 ?? ''}, ${input.tanggalAcara ?? null}, ${input.template ?? 'classic'}, ${jsonb(input.dataJson ?? {})}, ${input.status ?? 'draft'}, ${input.accessPin ?? null}, ${input.waTemplate ?? null})
 		RETURNING id, subdomain, nama_pihak_1, nama_pihak_2, tanggal_acara, template, data_json, status, owner_email, access_pin, wa_template, created_at, updated_at
 	`) as unknown as DbRow[];
 	return toRow(rows[0]);
@@ -106,7 +106,7 @@ export async function updateInvitation(
 			nama_pihak_2 = ${next.namaPihak2},
 			tanggal_acara = ${next.tanggalAcara},
 			template = ${next.template},
-			data_json = ${JSON.stringify(next.dataJson)}::jsonb,
+			data_json = ${jsonb(next.dataJson)},
 			status = ${next.status},
 			access_pin = ${next.accessPin},
 			wa_template = ${next.waTemplate}

@@ -193,15 +193,34 @@ try {
   await supa`
     INSERT INTO invitations (subdomain, nama_pihak_1, nama_pihak_2, tanggal_acara, template, data_json, status)
     VALUES (${slug}, ${data.couple.bride.name}, ${data.couple.groom.name}, '2026-09-21', 'classic', ${supa.json(data)}, 'active')
-    ON CONFLICT (subdomain) DO NOTHING
+    ON CONFLICT (subdomain) DO UPDATE
+      SET nama_pihak_1 = EXCLUDED.nama_pihak_1,
+          nama_pihak_2 = EXCLUDED.nama_pihak_2,
+          tanggal_acara = EXCLUDED.tanggal_acara,
+          data_json = EXCLUDED.data_json
   `;
-  console.log(`✓ Supabase: invitations siap, row '${slug}' aktif`);
+  console.log(`✓ Supabase: invitations siap, row '${slug}' aktif (data_json di-seed ulang dari wedding.ts)`);
 
   // E. FK + index -------------------------------------------------------------
   await supa`
     CREATE INDEX IF NOT EXISTS idx_guest_wishes_wedding_created
       ON guest_wishes (wedding, created_at DESC)
   `;
+  // Trigger updated_at otomatis (idempoten)
+  await supa`
+    CREATE OR REPLACE FUNCTION set_updated_at() RETURNS trigger AS $$
+    BEGIN NEW.updated_at = now(); RETURN NEW; END;
+    $$ LANGUAGE plpgsql
+  `;
+  await supa`
+    DROP TRIGGER IF EXISTS trg_invitations_updated_at ON invitations
+  `;
+  await supa`
+    CREATE TRIGGER trg_invitations_updated_at
+      BEFORE UPDATE ON invitations
+      FOR EACH ROW EXECUTE FUNCTION set_updated_at()
+  `;
+  console.log('✓ Supabase: trigger updated_at terpasang');
   await supa`
     DO $$
     BEGIN

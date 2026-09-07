@@ -29,3 +29,10 @@ export function db(): postgres.Sql {
 	}
 	return sql;
 }
+
+/** Parameter JSONB — nilai diserialisasi oleh postgres.js (bukan stringify manual,
+ *  yang menghasilkan JSON ter-encode ganda & melanggar CHECK jsonb_typeof = 'object'). */
+export function jsonb(v: unknown) {
+	// cast aman: JSON.stringify menerima nilai apa pun; tipe ketat driver hanya soal bentuk statis
+	return db().json(v as never);
+}
