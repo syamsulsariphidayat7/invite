@@ -81,7 +81,7 @@ function buildDataJson() {
     ],
     gifts: [...src.matchAll(/\{\s*bank:\s*'([^']+)',\s*number:\s*'([^']+)',\s*holder:\s*'([^']+)'\s*\}/g)]
       .map((m) => ({ type: 'ewallet', provider: m[1], owner: m[3], number: m[2] })),
-    gallery: ['hero', 'bride', 'groom'], // foto sekarang di repo; URL storage menyusul Fase 5
+    gallery: ['hero','gallery-1','gallery-2','gallery-3','gallery-4','gallery-5','gallery-6','gallery-7','gallery-8','gallery-9','gallery-10','gallery-11','gallery-12'],
     love_story: [...src.matchAll(/\{\s*title:\s*'([^']+)',\s*text:\s*\n?\s*'([\s\S]*?)'\s*\}/g)]
       .map((m) => ({ title: m[1], text: m[2] })),
     music_url: '/audio/wedding.mp3',

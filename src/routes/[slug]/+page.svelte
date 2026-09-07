@@ -93,7 +93,7 @@
 	<Gallery gallery={data.gallery} />
 	<LoveStory weddingData={data.resolved} />
 	<Gift weddingData={data.resolved} />
-	<Wishes initialWishes={data.wishes} initialTotal={data.total} guestName={guest} />
+	<Wishes initialWishes={data.wishes} initialTotal={data.total} guestName={guest} slug={data.slug} />
 	<Footer weddingData={data.resolved} />
 </main>
 

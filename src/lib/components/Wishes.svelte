@@ -8,8 +8,9 @@
 	let {
 		initialWishes = [],
 		initialTotal = 0,
-		guestName = ''
-	}: { initialWishes?: Wish[]; initialTotal?: number; guestName?: string } = $props();
+		guestName = '',
+		slug = 'ruhaeni-roni'
+	}: { initialWishes?: Wish[]; initialTotal?: number; guestName?: string; slug?: string } = $props();
 
 	let wishes = $state<Wish[]>(initialWishes);
 	let total = $state(initialTotal);
@@ -23,6 +24,11 @@
 	let guests = $state(1);
 	let message = $state('');
 	let website = $state('');
+	let turnstileToken = $state('');
+	let hasMore = $state(initialWishes.length < initialTotal);
+	let loadingMore = $state(false);
+
+	const turnstileSiteKey = $derived(typeof window !== 'undefined' ? (document.querySelector('meta[name="turnstile-sitekey"]') as HTMLMetaElement | null)?.content ?? '' : '');
 
 	$effect(() => {
 		if (guestName && !name) name = guestName;
@@ -63,10 +69,10 @@
 		busy = true;
 		status = { kind: 'idle', text: '' };
 		try {
-			const res = await fetch('/api/wishes', {
+			const res = await fetch(`/api/wishes?slug=${encodeURIComponent(slug)}`, {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ name: name.trim(), attendance, message: message.trim(), guests: attendance === 'hadir' ? guests : 0, website })
+				body: JSON.stringify({ name: name.trim(), attendance, message: message.trim(), guests: attendance === 'hadir' ? guests : 0, website, slug, turnstileToken })
 			});
 			const data = await res.json();
 			if (!res.ok) {
@@ -86,6 +92,19 @@
 		} finally {
 			busy = false;
 		}
+	}
+
+	async function loadMore() {
+		if (loadingMore || !hasMore) return;
+		loadingMore = true;
+		try {
+			const res = await fetch(`/api/wishes?slug=${encodeURIComponent(slug)}&limit=30&offset=${wishes.length}`);
+			const data = await res.json();
+			if (res.ok && Array.isArray(data.wishes)) {
+				wishes = [...wishes, ...data.wishes];
+				hasMore = wishes.length < (data.total ?? total);
+			}
+		} finally { loadingMore = false; }
 	}
 </script>
 
@@ -155,6 +174,10 @@
 				></textarea>
 			</label>
 			<input type="text" bind:value={website} tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;pointer-events:none;" />
+			{#if turnstileSiteKey}
+				<div class="cf-turnstile" data-sitekey={turnstileSiteKey} data-callback="onTurnstile" style="margin:0.6rem 0"></div>
+				<input type="hidden" bind:value={turnstileToken} />
+			{/if}
 
 			{#if status.kind === 'error'}
 				<p class="msg error"><AlertCircle size={14} /> {status.text}</p>
@@ -200,6 +223,9 @@
 						<span class="page-info">{page} / {totalPages}</span>
 						<button type="button" class="page-btn" disabled={page >= totalPages} onclick={() => (page += 1)}>Berikutnya ›</button>
 					</div>
+				{/if}
+				{#if hasMore}
+					<button type="button" class="btn btn-ghost" style="margin-top:0.6rem" onclick={loadMore} disabled={loadingMore}>{loadingMore ? 'Memuat…' : 'Muat lebih banyak'}</button>
 				{/if}
 			{/if}
 		</div>

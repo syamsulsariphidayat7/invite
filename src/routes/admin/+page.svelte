@@ -374,6 +374,16 @@
 		a.download = `${selected}-${exportType}.csv`;
 		a.click();
 	}
+	async function exportServer(fmt: 'xlsx' | 'pdf') {
+		if (!selected) return;
+		const res = await fetch(`/api/admin/wishes?slug=${encodeURIComponent(selected)}&format=${fmt}&type=${exportType}`);
+		if (!res.ok) { alert('Export gagal.'); return; }
+		const blob = await res.blob();
+		const a = document.createElement('a');
+		a.href = URL.createObjectURL(blob);
+		a.download = `${selected}-${exportType}.${fmt}`;
+		a.click();
+	}
 </script>
 
 <svelte:head><title>Admin — Undangan</title></svelte:head>
@@ -464,7 +474,9 @@
 								<option value="tamu">Tamu</option>
 								<option value="ucapan">Ucapan</option>
 							</select>
-							<button class="btn btn-ghost" onclick={exportCsv}>Export CSV</button>
+							<button class="btn btn-ghost" onclick={exportCsv}>CSV</button>
+							<button class="btn btn-ghost" onclick={() => exportServer('xlsx')}>Excel</button>
+							<button class="btn btn-ghost" onclick={() => exportServer('pdf')}>PDF</button>
 						</div>
 					</div>
 				{:else if tab === 'tamu'}

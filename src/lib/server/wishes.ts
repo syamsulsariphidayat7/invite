@@ -112,10 +112,12 @@ async function init(): Promise<boolean> {
 	}
 }
 
-/** Daftar ucapan terbaru (maks `limit`), diurutkan terbaru dulu. */
-export async function listWishes(weddingSlug: string, limit = 30): Promise<Wish[]> {
+/** Daftar ucapan terbaru (maks `limit` + offset untuk paging). */
+export async function listWishes(weddingSlug: string, limit = 30, offset = 0): Promise<Wish[]> {
+	const lim = Math.min(100, Math.max(1, Math.floor(limit) || 30));
+	const off = Math.max(0, Math.floor(offset) || 0);
 	if (!(await init())) {
-		return inMemory.slice(0, limit);
+		return inMemory.slice(off, off + lim);
 	}
 	try {
 		const rows = (await db()`
@@ -123,12 +125,12 @@ export async function listWishes(weddingSlug: string, limit = 30): Promise<Wish[
 			FROM guest_wishes
 			WHERE wedding = ${weddingSlug}
 			ORDER BY created_at DESC
-			LIMIT ${limit}
+			LIMIT ${lim} OFFSET ${off}
 		`) as unknown as Row[];
 		return rows.map(rowToWish);
 	} catch (e) {
 		console.error('[wishes] Gagal membaca database:', e);
-		return inMemory.slice(0, limit);
+		return inMemory.slice(off, off + lim);
 	}
 }
 
