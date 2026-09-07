@@ -5,7 +5,8 @@
 	import SocialIcon from './SocialIcon.svelte';
 	import BatikTexture from './BatikTexture.svelte';
 
-	const bases = wedding.photos.gallery;
+	let { gallery = null }: { gallery?: string[] | null } = $props();
+	const bases = $derived((gallery && gallery.length > 0 ? gallery : wedding.photos.gallery) as string[]);
 	let active = $state<number | null>(null);
 
 	function prev() {

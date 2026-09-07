@@ -1,11 +1,13 @@
 import { error } from '@sveltejs/kit';
 import { listWishes, countWishes } from '$lib/server/wishes';
+import { getInvitation } from '$lib/server/invitations';
 import { wedding } from '$lib/data/wedding';
 
 export const load = async ({ params }) => {
 	if (params.slug !== wedding.slug) {
 		error(404, 'Undangan tidak ditemukan.');
 	}
-	const [wishes, total] = await Promise.all([listWishes(params.slug), countWishes(params.slug)]);
-	return { wishes, total, slug: params.slug };
+	const [wishes, total, inv] = await Promise.all([listWishes(params.slug), countWishes(params.slug), getInvitation(params.slug).catch(() => null)]);
+	const gallery = inv?.dataJson && Array.isArray((inv.dataJson as Record<string, unknown>).gallery) ? ((inv.dataJson as Record<string, unknown>).gallery as string[]) : null;
+	return { wishes, total, slug: params.slug, gallery };
 };

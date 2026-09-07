@@ -1,5 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import { verifyPin, listGuests, addGuests, updateGuestSent, deleteGuest, deleteAllGuests } from '$lib/server/guests';
+import { checkRateLimit, clientKey } from '$lib/server/rateLimit';
 
 function getSlug(url: URL): string {
 	return url.searchParams.get('slug')?.trim() ?? '';
@@ -19,9 +20,12 @@ export async function GET({ request, url }) {
 	return json({ guests });
 }
 
-export async function POST({ request, url }) {
+export async function POST({ request, url, getClientAddress }) {
 	const slug = getSlug(url);
 	if (!slug) error(400, 'slug required');
+	const ip = clientKey(request, (() => { try { return getClientAddress(); } catch { return 'unknown'; } })());
+	const rl = checkRateLimit(`guests:${ip}:${slug}`, 20, 60_000);
+	if (!rl.allowed) error(429, `Terlalu sering. Coba lagi ${rl.retryAfter} detik.`);
 	const pin = getPin(request, url);
 	const auth = await verifyPin(slug, pin);
 	if (!auth.ok) error(401, 'PIN salah atau tidak diberikan.');
@@ -31,7 +35,8 @@ export async function POST({ request, url }) {
 	} catch {
 		error(400, 'Body harus JSON.');
 	}
-	const { names } = (body ?? {}) as { names?: unknown };
+	const { names, website } = (body ?? {}) as { names?: unknown; website?: unknown };
+	if (typeof website === 'string' && website.trim()) return json({ added: [], count: 0 }, { status: 201 });
 	if (!Array.isArray(names) || names.length === 0) error(400, 'names harus array berisi minimal 1 nama.');
 	const strNames = names.filter((n): n is string => typeof n === 'string').map((n) => n.trim()).filter(Boolean);
 	if (strNames.length === 0) error(400, 'names harus berisi string tidak kosong.');

@@ -30,6 +30,7 @@
 
 	let single = $state('');
 	let bulk = $state('');
+	let honey = $state('');
 	let guests = $state<GuestRow[]>([]);
 	let search = $state('');
 	let filter = $state<'all' | 'pending' | 'sent'>('all');
@@ -41,6 +42,7 @@
 	let pinError = $state('');
 	let loading = $state(false);
 	let pinChecking = $state(false);
+	let selectedIds = $state<Set<string>>(new Set());
 
 	const DEFAULT_TEMPLATE = `Halo {nama}, kamu diundang ke pernikahan Ruhaeni & Asep Roni 💍\n\nBuka undangannya di sini ya:\n{link}\n\nMohon doa & kehadirannya 🙏`;
 	let template = $state(DEFAULT_TEMPLATE);
@@ -181,7 +183,7 @@
 			const res = await fetch(apiUrl('', ''), {
 				method: 'POST',
 				headers: { 'content-type': 'application/json', ...headers() },
-				body: JSON.stringify({ names: [n] })
+				body: JSON.stringify({ names: [n], website: honey })
 			});
 			if (!res.ok) {
 				const j = await res.json().catch(() => null);
@@ -209,7 +211,7 @@
 			const res = await fetch(apiUrl('', ''), {
 				method: 'POST',
 				headers: { 'content-type': 'application/json', ...headers() },
-				body: JSON.stringify({ names: lines })
+				body: JSON.stringify({ names: lines, website: honey })
 			});
 			if (!res.ok) {
 				const j = await res.json().catch(() => null);
@@ -253,6 +255,49 @@
 
 	function resetTemplate() {
 		template = DEFAULT_TEMPLATE;
+	}
+
+	function toggleSelect(id: string) {
+		const n = new Set(selectedIds);
+		if (n.has(id)) n.delete(id);
+		else n.add(id);
+		selectedIds = n;
+	}
+	function selectAllFiltered() {
+		selectedIds = new Set(filteredGuests.map((g) => g.id));
+	}
+	function clearSelection() {
+		selectedIds = new Set();
+	}
+	function selectedLinksText(): string {
+		return guests
+			.filter((g) => selectedIds.has(g.id))
+			.map((g) => `${g.name}: ${linkFor(g.name)}`)
+			.join('\n');
+	}
+	function selectedWaText(): string {
+		return guests
+			.filter((g) => selectedIds.has(g.id))
+			.map((g) => waMessageFor(g.name))
+			.join('\n\n---\n\n');
+	}
+	async function copySelectedLinks() {
+		const txt = selectedLinksText();
+		if (!txt) return;
+		await copy(txt, 'bulk-links');
+	}
+	async function openSelectedWa() {
+		for (const g of guests.filter((x) => selectedIds.has(x.id))) {
+			window.open(waLink(g.name), '_blank');
+			await new Promise((r) => setTimeout(r, 280));
+			patchSent(g, true);
+		}
+	}
+	async function markSelectedSent(sent: boolean) {
+		for (const id of selectedIds) {
+			const g = guests.find((x) => x.id === id);
+			if (g && g.sent !== sent) await patchSent(g, sent);
+		}
 	}
 
 	const filteredGuests = $derived(
@@ -318,6 +363,7 @@
 					<button class="btn-ghost sm" onclick={logout}>Keluar</button>
 				</div>
 
+				<input type="text" bind:value={honey} tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;pointer-events:none;" />
 				<label>
 					<span><UserPlus size={13} /> Tambah satu tamu</span>
 					<div class="row">
@@ -386,6 +432,19 @@
 				</div>
 			</div>
 
+			{#if guests.length > 0}
+				<div class="bulk-bar">
+					<label class="bulk-check"><input type="checkbox" checked={selectedIds.size === filteredGuests.length && filteredGuests.length > 0} onchange={selectedIds.size === filteredGuests.length ? clearSelection : selectAllFiltered} /> Pilih semua ({filteredGuests.length})</label>
+					{#if selectedIds.size > 0}
+						<span class="bulk-count">{selectedIds.size} dipilih</span>
+						<button class="btn btn-ghost sm" onclick={copySelectedLinks}>Salin Link ({selectedIds.size})</button>
+						<button class="btn btn-green sm" onclick={openSelectedWa}>Kirim WA ({selectedIds.size})</button>
+						<button class="btn btn-ghost sm" onclick={() => markSelectedSent(true)}>Tandai terkirim</button>
+						<button class="btn btn-ghost sm" onclick={clearSelection}>Batal</button>
+					{/if}
+				</div>
+			{/if}
+
 			<div class="list">
 				{#if filteredGuests.length === 0}
 					<div class="empty">
@@ -398,6 +457,7 @@
 				{:else}
 					{#each filteredGuests as g, i}
 						<article class="item" class:is-sent={g.sent}>
+							<label class="bulk-cb"><input type="checkbox" checked={selectedIds.has(g.id)} onchange={() => toggleSelect(g.id)} /></label>
 							<button
 								type="button"
 								class="btn-check"
@@ -686,9 +746,35 @@
 		padding: 2rem 1rem;
 		background: var(--card);
 	}
+	.bulk-bar {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		flex-wrap: wrap;
+		background: var(--card);
+		border: 1px solid var(--line);
+		border-radius: 12px;
+		padding: 0.6em 0.8em;
+		margin-bottom: 1rem;
+		font-size: 12.5px;
+	}
+	.bulk-check {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4em;
+		font-weight: 600;
+		color: var(--ink-2);
+	}
+	.bulk-cb {
+		display: grid;
+		place-items: center;
+	}
+	.bulk-count {
+		color: var(--ink-3);
+	}
 	.item {
 		display: grid;
-		grid-template-columns: auto 1fr auto;
+		grid-template-columns: auto auto 1fr auto;
 		gap: 0.75rem;
 		align-items: center;
 		background: var(--card);

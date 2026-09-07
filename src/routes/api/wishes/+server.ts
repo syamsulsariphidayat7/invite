@@ -1,6 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import { addWish, countWishes, listWishes } from '$lib/server/wishes';
 import { wedding } from '$lib/data/wedding';
+import { checkRateLimit, clientKey } from '$lib/server/rateLimit';
 
 export async function GET() {
 	const [wishes, total] = await Promise.all([
@@ -10,7 +11,10 @@ export async function GET() {
 	return json({ wishes, total });
 }
 
-export async function POST({ request }) {
+export async function POST({ request, getClientAddress }) {
+	const ip = clientKey(request, (() => { try { return getClientAddress(); } catch { return 'unknown'; } })());
+	const rl = checkRateLimit(`wishes:${ip}`, 6, 60_000);
+	if (!rl.allowed) error(429, `Terlalu sering. Coba lagi ${rl.retryAfter} detik.`);
 	let body: unknown;
 	try {
 		body = await request.json();
@@ -18,12 +22,16 @@ export async function POST({ request }) {
 		error(400, 'Format data tidak valid.');
 	}
 
-	const { name, attendance, message, guests } = (body ?? {}) as {
+	const { name, attendance, message, guests, website } = (body ?? {}) as {
 		name?: unknown;
 		attendance?: unknown;
 		message?: unknown;
 		guests?: unknown;
+		website?: unknown;
 	};
+	if (typeof website === 'string' && website.trim()) {
+		return json({ success: true, wish: { id: 0, name: '', attendance: '', message: '', guests: 0, createdAt: new Date().toISOString() } }, { status: 201 });
+	}
 
 	if (typeof name !== 'string' || name.trim().length < wedding.wishes.minName) {
 		error(400, `Nama minimal ${wedding.wishes.minName} karakter.`);

@@ -3,7 +3,7 @@
 Terakhir diperbarui: 2026-09-07
 
 ## Fase Aktif
-**Panel Admin `/admin` + Supabase Storage** — Auth `ADMIN_PIN` + CRUD `invitations` + upload galeri + moderasi tamu/ucapan selesai.
+**Anti-spam + Galeri Storage + WA mass-share** — rate limit + honeypot, upload auto-sync `data_json.gallery`, bulk select WA.
 
 ## Status Fase
 | Fase | Status |
@@ -16,11 +16,14 @@ Terakhir diperbarui: 2026-09-07
 | Dynamic Slug Routing `/[slug]` | ✅ Selesai (`/ruhaeni-roni`) |
 | Kelola Tamu Konsumen (PIN, `/[slug]/kelola`) | ✅ Selesai — DB `invitation_guests`, API `/api/guests`, konsumen self-service |
 | Panel Admin `/admin` | ✅ Selesai — `ADMIN_PIN` + `hooks.server.ts` + `invitations` CRUD + upload Storage + moderasi |
+| Anti-spam (rate limit + honeypot) | ✅ Selesai — `rateLimit.ts`, `/api/wishes` 6/menit + `/api/guests` 20/menit, honeypot `website` |
+| Galeri Storage → `data_json.gallery` | ✅ Selesai — upload auto-append gallery (Photo direct URL), sinkron ke `/[slug]` |
+| WA Mass-share | ✅ Selesai — bulk select di `/{slug}/kelola`, salin link massal + buka WA berurutan + tandai terkirim |
 | Pre-production Cleanup | ✅ Selesai |
 | Deployment (Vercel + Neon) | ✅ Selesai — auto-deploy dari GitHub, custom domain `invite.boundless.my.id`, `DATABASE_URL` aktif (API ucapan 200 + data terbaca, 2026-09-06) |
 
 ## Sedang Dikerjakan
-- Bersihkan baris tes di `guest_wishes` produksi ("Tes Lokal", "Verifikasi Produksi", "hwd").
+- (kosong — `guest_wishes` bersih, verifikasi 2026-09-07: 0 baris di Supabase)
 
 ## Sudah Selesai
 - Undangan lengkap: layar sampul + musik, hero, mempelai, ayat, countdown, akad & resepsi (20–21 Sep 2026), galeri, love story 3 bab, amplop digital, ucapan tamu → Neon, nav bawah, footer.
@@ -31,7 +34,9 @@ Terakhir diperbarui: 2026-09-07
 - Nav & Scroll: sticky top countdown saat scroll, bottom nav active indicator sesuai posisi scroll, scroll progress bar top.
 - Data produksi 2026-09-06: DANA Ruhaeni 085724087380 & Asep Roni 085624398337, IG _ruhaeni & ronii_wiguna, footer link Boundless `http://boundless.my.id/`.
 - Kelola Tamu Konsumen: `/{slug}/kelola` PIN 6-digit per undangan, `api/guests` CRUD + `invitation_guests` (sent/sent_at, dedup normalized_name), `/tamu` legacy tetap; `invitations.access_pin + wa_template`.
-- Panel Admin `/admin`: login `ADMIN_PIN` env (`hooks.server.ts` + `admin_pin` httpOnly cookie), CRUD `invitations` (`api/admin/invitations`), detail tamu/ucapan per subdomain, export CSV, upload galeri `invitation-photos/{slug}/` ke Supabase Storage (`@supabase/supabase-js` + `SUPABASE_URL/SERVICE_ROLE_KEY`).
+ - Panel Admin `/admin`: login `ADMIN_PIN` env (`hooks.server.ts` + `admin_pin` httpOnly cookie), CRUD `invitations` (`api/admin/invitations`), detail tamu/ucapan per subdomain, export CSV, upload galeri `invitation-photos/{slug}/` ke Supabase Storage (`@supabase/supabase-js` + `SUPABASE_URL/SECRET_KEY`, bucket Public) — auto-sync `data_json.gallery`.
+ - Anti-spam: `rateLimit.ts` in-memory (`wishes` 6/min/IP, `guests` 20/min/IP/slug) + honeypot field `website` (silent 201 jika terisi).
+ - WA Mass-share: `/{slug}/kelola` bulk checkbox, pilih semua filtered, salin link massal, kirim WA berurutan + auto tandai terkirim.
 - SEO & Open Graph Preview: meta `og:image`, `og:url`, `og:title`, `og:description`, `twitter:card` summary_large_image, canonical link ke `https://invite.boundless.my.id/ruhaeni-roni`.
 - Kompresi Foto: 15 foto dioptimasi (max 1600px, quality 82%, interlaced), ukuran total turun dari ~28 MB ke ~4.3 MB (hemat 85% bandwidth).
 
@@ -51,5 +56,6 @@ Terakhir diperbarui: 2026-09-07
 6. ✅ Polish & cleanup — done 2026-09-06
 7. ✅ Data produksi rekening DANA & IG
 8. ✅ Slug routing `/[slug]` (`/ruhaeni-roni`) — path-based aktif; subdomain via Fase 7 opsional
-9. ✅ Kelola tamu konsumen `/[slug]/kelola` (PIN, DB-synced)
-10. ✅ Panel admin `/admin` (ADMIN_PIN + CRUD + Storage)
+9. ✅ Kelola tamu konsumen `/[slug]/kelola` (PIN, DB-synced, bulk WA)
+10. ✅ Panel admin `/admin` (ADMIN_PIN + CRUD + Storage auto-gallery)
+11. ✅ Anti-spam + honeypot + rate limit

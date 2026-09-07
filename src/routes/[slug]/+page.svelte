@@ -90,7 +90,7 @@
 	<Couple />
 	<Verse />
 	<Events />
-	<Gallery />
+	<Gallery gallery={data.gallery} />
 	<LoveStory />
 	<Gift />
 	<Wishes initialWishes={data.wishes} initialTotal={data.total} guestName={guest} />

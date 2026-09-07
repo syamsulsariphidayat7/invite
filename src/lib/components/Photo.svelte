@@ -11,11 +11,12 @@
 	let idx = $state(0);
 	let loaded = $state(false);
 
-	const sources = $derived([
-		...['jpg', 'jpeg', 'png', 'webp'].map((e) => `/photos/${base}.${e}`),
-		`/photos/placeholders/${base}.svg`
-	]);
-
+	const isDirect = $derived(base.startsWith('http://') || base.startsWith('https://') || base.startsWith('/photos/') || base.startsWith('/'));
+	const sources = $derived(
+		isDirect
+			? [base, `/photos/placeholders/${base.split('/').pop()?.split('.')[0] ?? 'hero'}.svg`]
+			: [...['jpg', 'jpeg', 'png', 'webp'].map((e) => `/photos/${base}.${e}`), `/photos/placeholders/${base}.svg`]
+	);
 	const src = $derived(sources[idx]);
 </script>
 

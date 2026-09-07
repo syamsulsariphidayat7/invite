@@ -22,6 +22,7 @@
 	let attendance = $state<'' | 'hadir' | 'tidak'>('');
 	let guests = $state(1);
 	let message = $state('');
+	let website = $state('');
 
 	$effect(() => {
 		if (guestName && !name) name = guestName;
@@ -65,7 +66,7 @@
 			const res = await fetch('/api/wishes', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ name: name.trim(), attendance, message: message.trim(), guests: attendance === 'hadir' ? guests : 0 })
+				body: JSON.stringify({ name: name.trim(), attendance, message: message.trim(), guests: attendance === 'hadir' ? guests : 0, website })
 			});
 			const data = await res.json();
 			if (!res.ok) {
@@ -153,6 +154,7 @@
 					placeholder="Tulis ucapan dan doa restu untuk kami…"
 				></textarea>
 			</label>
+			<input type="text" bind:value={website} tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;pointer-events:none;" />
 
 			{#if status.kind === 'error'}
 				<p class="msg error"><AlertCircle size={14} /> {status.text}</p>

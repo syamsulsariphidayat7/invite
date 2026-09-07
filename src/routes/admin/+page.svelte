@@ -240,8 +240,11 @@
 				return;
 			}
 			const urls: string[] = j.urls ?? [];
-			uploadMsg = `${urls.length} foto terupload.`;
-			alert(`Foto terupload:\n${urls.join('\n')}\n\nSimpan URL ke data_json.gallery via edit jika diperlukan.`);
+			uploadMsg = `${urls.length} foto terupload & gallery terupdate.`;
+			if (j.gallery) {
+				const it = items.find((x) => x.subdomain === selected);
+				if (it) it.dataJson = { ...(it.dataJson ?? {}), gallery: j.gallery };
+			}
 		} catch {
 			uploadMsg = 'Gagal upload.';
 		} finally {

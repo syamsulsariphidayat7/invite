@@ -1,6 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { createClient } from '@supabase/supabase-js';
+import { getInvitation, updateInvitation } from '$lib/server/invitations';
 
 export async function POST({ request, locals, url }) {
 	if (!locals.adminAuthed) error(401, 'Unauthorized');
@@ -39,5 +40,16 @@ export async function POST({ request, locals, url }) {
 		uploaded.push(data.publicUrl);
 	}
 
-	return json({ urls: uploaded });
+	let galleryUrls: string[] = [];
+	try {
+		const inv = await getInvitation(slug);
+		if (inv) {
+			const cur = inv.dataJson as Record<string, unknown>;
+			const arr = Array.isArray(cur.gallery) ? (cur.gallery as string[]) : [];
+			const merged = [...arr, ...uploaded].slice(-120);
+			await updateInvitation(slug, { dataJson: { ...cur, gallery: merged } });
+			galleryUrls = merged;
+		}
+	} catch {}
+	return json({ urls: uploaded, gallery: galleryUrls });
 }
