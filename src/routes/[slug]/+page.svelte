@@ -99,10 +99,10 @@
 			<a href={String((data.resolved as unknown as Record<string, string>)._livestream)} target="_blank" rel="noopener" class="btn btn-green">Tonton Live Streaming</a>
 		</section>
 	{/if}
-	<Gallery gallery={data.gallery} />
+	<Gallery gallery={data.gallery} weddingData={data.resolved} />
 	<LoveStory weddingData={data.resolved} />
 	<Gift weddingData={data.resolved} />
-	<Wishes initialWishes={data.wishes} initialTotal={data.total} guestName={guest} slug={data.slug} />
+	<Wishes initialWishes={data.wishes} initialTotal={data.total} guestName={guest} slug={data.slug} weddingData={data.resolved} />
 	<Footer weddingData={data.resolved} />
 </main>
 

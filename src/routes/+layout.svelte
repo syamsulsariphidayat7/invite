@@ -2,11 +2,12 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import { wedding } from '$lib/data/wedding';
 
-	let { children } = $props();
+	let { children, data } = $props();
 </script>
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
+	<meta name="turnstile-sitekey" content={data?.turnstileSiteKey ?? ''} />
 	<title>{wedding.siteTitle}</title>
 	<meta name="description" content={wedding.metaDescription} />
 	<link rel="canonical" href="https://invite.boundless.my.id/{wedding.slug}" />

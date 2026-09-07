@@ -69,12 +69,14 @@ export async function POST({ request, getClientAddress, url }) {
 	const { env } = await import('$env/dynamic/private');
 	if (env.TURNSTILE_SECRET_KEY) {
 		const secret = env.TURNSTILE_SECRET_KEY;
-		if (secret && tt) {
-			try {
-				const vr = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ secret, response: tt, remoteip: ip }) });
-				const vj = await vr.json().catch(() => null) as { success?: boolean } | null;
-				if (!vj?.success) error(400, 'Verifikasi captcha gagal.');
-			} catch (e) { if ((e as { status?: number })?.status === 400) throw e; }
+		if (!tt?.trim()) error(400, 'Verifikasi captcha wajib.');
+		try {
+			const vr = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ secret, response: tt, remoteip: ip }) });
+			const vj = (await vr.json().catch(() => null)) as { success?: boolean } | null;
+			if (!vj?.success) error(400, 'Verifikasi captcha gagal.');
+		} catch (e) {
+			if ((e as { status?: number })?.status === 400) throw e;
+			error(400, 'Verifikasi captcha gagal.');
 		}
 	}
 

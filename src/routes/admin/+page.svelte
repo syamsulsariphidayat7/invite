@@ -58,6 +58,14 @@
 	let kontenLivestream = $state('');
 	let kontenStoryIntro = $state('');
 	let kontenStoryChapters = $state<{ title: string; text: string }[]>([]);
+	let kontenGiftNote = $state('');
+	let kontenVenue = $state({ name: '', address: '', maps_url: '' });
+	let kontenSocial = $state({ whatsapp: '', instagram: '' });
+	let kontenIgFilter = $state('');
+	let kontenWishes = $state({ minName: 2, minMessage: 2, note: '' });
+	let kontenMusicYt = $state('');
+	let kontenMusicStart = $state('');
+	let kontenPhotosCover = $state('');
 
 	let showForm = $state(false);
 	let editing = $state<string | null>(null);
@@ -218,7 +226,20 @@
 		const th = (dj.theme as Record<string, string> | undefined) ?? {};
 		kontenThemePrimary = th.primary ?? '#8b5e3c';
 		kontenThemeSecondary = th.secondary ?? '#f5ebe0';
-		kontenMusic = (dj.music_url as string) ?? '';
+		const mDj = (dj.music as Record<string, unknown> | undefined) ?? null;
+		kontenMusic = (dj.music_url as string) ?? (typeof mDj?.src === 'string' ? mDj.src : '');
+		kontenMusicYt = (dj.music_youtube_id as string) ?? (typeof mDj?.youtubeId === 'string' ? mDj.youtubeId : '');
+		const musicStartRaw = (dj.music_start_seconds as number | string | undefined) ?? (typeof mDj?.startSeconds === 'number' ? mDj.startSeconds : null);
+		kontenMusicStart = musicStartRaw == null ? '' : String(musicStartRaw);
+		kontenGiftNote = (dj.gift_note as string) ?? ((dj.gift as Record<string, string> | undefined)?.note ?? '');
+		const vn = (dj.venue as Record<string, string> | undefined) ?? null;
+		kontenVenue = { name: vn?.name ?? '', address: vn?.address ?? '', maps_url: vn?.maps_url ?? vn?.mapsUrl ?? '' };
+		const sc = (dj.social as Record<string, string> | undefined) ?? null;
+		kontenSocial = { whatsapp: sc?.whatsapp ?? '', instagram: sc?.instagram ?? '' };
+		kontenIgFilter = (dj.instagram_filter_url as string) ?? (dj.instagramFilterUrl as string) ?? '';
+		const ws = (dj.wishes as Record<string, unknown> | undefined) ?? null;
+		kontenWishes = { minName: typeof ws?.minName === 'number' ? ws.minName : 2, minMessage: typeof ws?.minMessage === 'number' ? ws.minMessage : 2, note: typeof ws?.note === 'string' ? ws.note : '' };
+		kontenPhotosCover = (dj.photos as Record<string, string> | undefined)?.cover ?? '';
 		kontenLivestream = (dj.livestream_url as string) ?? '';
 		kontenStoryIntro = (dj.love_story_intro as string) ?? ((dj.love_story as unknown[]) ? '' : '');
 		const ls = Array.isArray(dj.love_story) ? (dj.love_story as { title: string; text: string }[]) : [];
@@ -268,6 +289,27 @@
 				couple: { bride: { ...kontenBride }, groom: { ...kontenGroom } },
 				verse: kontenVerseOff ? null : { arabic: kontenVerse.arabic, translation: kontenVerse.translation, source: kontenVerse.source },
 				music_url: kontenMusic.trim() || null,
+				music_youtube_id: kontenMusicYt.trim() || null,
+				music_start_seconds: kontenMusicStart.trim() ? Number(kontenMusicStart) : null,
+				gift_note: kontenGiftNote.trim() || null,
+				venue:
+					kontenVenue.name.trim() || kontenVenue.address.trim() || kontenVenue.maps_url.trim()
+						? { name: kontenVenue.name.trim(), address: kontenVenue.address.trim(), maps_url: kontenVenue.maps_url.trim() }
+						: null,
+				social:
+					kontenSocial.whatsapp.trim() || kontenSocial.instagram.trim()
+						? { whatsapp: kontenSocial.whatsapp.trim(), instagram: kontenSocial.instagram.trim() }
+						: null,
+				instagram_filter_url: kontenIgFilter.trim() || null,
+				wishes: {
+					minName: kontenWishes.minName,
+					minMessage: kontenWishes.minMessage,
+					note: kontenWishes.note.trim()
+				},
+				photos: {
+					...(typeof cur.photos === 'object' && cur.photos ? (cur.photos as Record<string, unknown>) : {}),
+					cover: kontenPhotosCover.trim() || null
+				},
 				livestream_url: kontenLivestream.trim() || null,
 				love_story: kontenStoryChapters.filter((c) => c.title.trim() || c.text.trim()),
 				love_story_intro: kontenStoryIntro
@@ -564,6 +606,9 @@
 						{/each}
 						<button class="btn btn-ghost sm" onclick={() => (kontenGifts = [...kontenGifts, { type: 'ewallet', provider: 'DANA', owner: '', number: '' }])}><Plus size={12} /> Tambah Gift</button>
 
+						<h3>Amplop Digital</h3>
+						<label><span>Catatan gift (opsional)</span><textarea rows="2" bind:value={kontenGiftNote}></textarea></label>
+
 						<h3>Mempelai</h3>
 						<div class="grid2"><label><span>Bride name</span><input bind:value={kontenBride.name} /></label><label><span>Bride full_name</span><input bind:value={kontenBride.full_name} /></label></div>
 						<label><span>Bride relation</span><textarea rows="2" bind:value={kontenBride.relation}></textarea></label>
@@ -571,6 +616,10 @@
 						<div class="grid2"><label><span>Groom name</span><input bind:value={kontenGroom.name} /></label><label><span>Groom full_name</span><input bind:value={kontenGroom.full_name} /></label></div>
 						<label><span>Groom relation</span><textarea rows="2" bind:value={kontenGroom.relation}></textarea></label>
 						<div class="grid2"><label><span>Groom IG</span><input bind:value={kontenGroom.instagram} /></label><label><span>Groom WA</span><input bind:value={kontenGroom.whatsapp} /></label></div>
+
+						<h3>Lokasi</h3>
+						<div class="grid2"><label><span>Nama venue</span><input bind:value={kontenVenue.name} /></label><label><span>Maps URL</span><input bind:value={kontenVenue.maps_url} /></label></div>
+						<label><span>Alamat</span><textarea rows="2" bind:value={kontenVenue.address}></textarea></label>
 
 						<h3>Ayat</h3>
 						<label class="chk"><input type="checkbox" checked={!kontenVerseOff} onchange={(e) => (kontenVerseOff = !(e.target as HTMLInputElement).checked)} /> Tampilkan ayat</label>
@@ -591,9 +640,17 @@
 						{/each}
 						<button class="btn btn-ghost sm" onclick={() => (kontenStoryChapters = [...kontenStoryChapters, { title: '', text: '' }])}><Plus size={12} /> Tambah Bab</button>
 
+						<h3>Sosial, Ucapan & Cover</h3>
+						<div class="grid2"><label><span>WhatsApp footer</span><input placeholder="https://wa.me/62812..." bind:value={kontenSocial.whatsapp} /></label><label><span>Instagram footer</span><input placeholder="https://instagram.com/..." bind:value={kontenSocial.instagram} /></label></div>
+						<label><span>Instagram Filter URL</span><input placeholder="https://www.instagram.com/ar/..." bind:value={kontenIgFilter} /></label>
+						<div class="grid2"><label><span>Min. nama (karakter)</span><input type="number" min="1" max="50" bind:value={kontenWishes.minName} /></label><label><span>Min. pesan (karakter)</span><input type="number" min="1" max="500" bind:value={kontenWishes.minMessage} /></label></div>
+						<label><span>Catatan ucapan</span><input placeholder="Khusus untuk tamu undangan" bind:value={kontenWishes.note} /></label>
+						<label><span>Foto cover sampul</span><input placeholder="URL Supabase atau /photos/hero" bind:value={kontenPhotosCover} /></label>
+
 						<h3>Tema & Media</h3>
 						<div class="grid2"><label><span>Primary</span><input type="color" bind:value={kontenThemePrimary} /></label><label><span>Secondary</span><input type="color" bind:value={kontenThemeSecondary} /></label></div>
 						<label><span>Music URL</span><input placeholder="/audio/wedding.mp3 atau https://..." bind:value={kontenMusic} /></label>
+						<div class="grid2"><label><span>YouTube ID (fallback)</span><input placeholder="dQw4w9WgXcQ" bind:value={kontenMusicYt} /></label><label><span>Mulai detik ke-</span><input type="number" min="0" max="600" bind:value={kontenMusicStart} /></label></div>
 						<label><span>Livestream URL</span><input bind:value={kontenLivestream} /></label>
 
 						<div class="modal-actions">

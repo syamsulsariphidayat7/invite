@@ -5,8 +5,9 @@
 	import SocialIcon from './SocialIcon.svelte';
 	import BatikTexture from './BatikTexture.svelte';
 
-	let { gallery = null }: { gallery?: string[] | null } = $props();
-	const bases = $derived((gallery && gallery.length > 0 ? gallery : wedding.photos.gallery) as string[]);
+	let { gallery = null, weddingData = null }: { gallery?: string[] | null; weddingData?: typeof wedding | null } = $props();
+	const w = $derived((weddingData ?? wedding) as typeof wedding);
+	const bases = $derived((gallery && gallery.length > 0 ? gallery : w.photos.gallery) as string[]);
 	let active = $state<number | null>(null);
 
 	function prev() {
@@ -39,18 +40,18 @@
 	<BatikTexture variant="light" opacity={0.05} size={210} />
 	<div class="wrap">
 		<!-- Blok ajakan filter Instagram (disembunyikan jika kosong) -->
-		{#if wedding.instagramFilterUrl}
+		{#if w.instagramFilterUrl}
 			<div class="ig-promo" data-reveal>
 				<p>
 					Bantu kami mengabadikan momen terbaik di hari pernikahan kami dengan{' '}
 					<strong>“Instagram Filter”</strong> di stories. Jangan lupa tag kami ya!
 				</p>
 				<div class="ig-actions">
-					<a class="btn ig-btn" href={wedding.instagramFilterUrl} target="_blank" rel="noopener">
+					<a class="btn ig-btn" href={w.instagramFilterUrl} target="_blank" rel="noopener">
 						<SocialIcon size={15} />
 						Wedding Filter
 					</a>
-					<a class="btn ghost-ig" href={wedding.social.instagram} target="_blank" rel="noopener">
+					<a class="btn ghost-ig" href={w.social.instagram} target="_blank" rel="noopener">
 						<SocialIcon size={15} />
 						Instagram
 					</a>

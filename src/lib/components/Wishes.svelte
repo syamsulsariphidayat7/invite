@@ -9,8 +9,10 @@
 		initialWishes = [],
 		initialTotal = 0,
 		guestName = '',
-		slug = 'ruhaeni-roni'
-	}: { initialWishes?: Wish[]; initialTotal?: number; guestName?: string; slug?: string } = $props();
+		slug = 'ruhaeni-roni',
+		weddingData = null
+	}: { initialWishes?: Wish[]; initialTotal?: number; guestName?: string; slug?: string; weddingData?: typeof wedding | null } = $props();
+	const w = $derived((weddingData ?? wedding) as typeof wedding);
 
 	let wishes = $state<Wish[]>(initialWishes);
 	let total = $state(initialTotal);
@@ -38,6 +40,17 @@
 		if (page > totalPages) page = totalPages;
 		if (page < 1) page = 1;
 	});
+	$effect(() => {
+		if (!turnstileSiteKey) return;
+		const id = 'cf-turnstile-script';
+		if (document.getElementById(id)) return;
+		const s = document.createElement('script');
+		s.id = id;
+		s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+		s.async = true;
+		document.head.appendChild(s);
+		(window as unknown as Record<string, unknown>).onTurnstile = (token: string) => { turnstileToken = token; };
+	});
 	let busy = $state(false);
 	let status = $state<{ kind: 'idle' | 'error' | 'ok'; text: string }>({ kind: 'idle', text: '' });
 
@@ -50,13 +63,13 @@
 	});
 
 	function validate(): string | null {
-		if (name.trim().length < wedding.wishes.minName) return `Nama minimal ${wedding.wishes.minName} karakter.`;
+		if (name.trim().length < w.wishes.minName) return `Nama minimal ${w.wishes.minName} karakter.`;
 		if (attendance !== 'hadir' && attendance !== 'tidak')
 			return 'Silakan pilih konfirmasi kehadiran terlebih dahulu.';
 		if (attendance === 'hadir' && (guests < 1 || guests > 10))
 			return 'Jumlah kehadiran 1-10 orang.';
-		if (message.trim().length < wedding.wishes.minMessage)
-			return `Ucapan minimal ${wedding.wishes.minMessage} karakter.`;
+		if (message.trim().length < w.wishes.minMessage)
+			return `Ucapan minimal ${w.wishes.minMessage} karakter.`;
 		return null;
 	}
 
@@ -116,7 +129,7 @@
 		<Ornament tone="green" />
 
 		<form class="form" data-reveal onsubmit={(e) => { e.preventDefault(); submit(); }}>
-			<p class="note">* {wedding.wishes.note} *<br />Minimal {wedding.wishes.minMessage} karakter.</p>
+			<p class="note">* {w.wishes.note} *<br />Minimal {w.wishes.minMessage} karakter.</p>
 
 			<label>
 				<span>Nama</span>

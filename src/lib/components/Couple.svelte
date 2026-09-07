@@ -8,6 +8,16 @@
 
 	let { weddingData = null }: { weddingData?: typeof wedding | null } = $props();
 	const w = $derived((weddingData ?? wedding) as typeof wedding);
+
+	// escape HTML dulu (konten dari DB/admin), baru ubah \n → <br />
+	function safeRelation(s: string): string {
+		return s
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;')
+			.replace(/\n/g, '<br />');
+	}
 </script>
 
 <section id="couple" class="couple" aria-label="Pasangan mempelai">
@@ -21,7 +31,7 @@
 					<span class="photo-ring" aria-hidden="true"></span>
 					<div class="photo-caption">
 						<h2 class="caption-name" data-reveal style="--d:.18s">{w.bride.name}</h2>
-						<p class="caption-relation" data-reveal style="--d:.26s">{@html w.bride.relation.replace(/\n/g, '<br />')}</p>
+						<p class="caption-relation" data-reveal style="--d:.26s">{@html safeRelation(w.bride.relation)}</p>
 						<div class="socials socials--overlay" data-reveal style="--d:.34s">
 							{#if w.bride.instagram}
 								<a href={w.bride.instagram} target="_blank" rel="noopener" aria-label="Instagram">
@@ -52,7 +62,7 @@
 					<span class="photo-ring" aria-hidden="true"></span>
 					<div class="photo-caption">
 						<h2 class="caption-name" data-reveal style="--d:.18s">{w.groom.name}</h2>
-						<p class="caption-relation" data-reveal style="--d:.26s">{@html w.groom.relation.replace(/\n/g, '<br />')}</p>
+						<p class="caption-relation" data-reveal style="--d:.26s">{@html safeRelation(w.groom.relation)}</p>
 						<div class="socials socials--overlay" data-reveal style="--d:.34s">
 							{#if w.groom.instagram}
 								<a href={w.groom.instagram} target="_blank" rel="noopener" aria-label="Instagram">

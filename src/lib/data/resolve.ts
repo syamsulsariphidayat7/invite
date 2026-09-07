@@ -25,7 +25,15 @@ export function resolveWedding(dataJson: Record<string, unknown> | null | undefi
 	const galleryDj = Array.isArray(dj.gallery) ? (dj.gallery as string[]) : null;
 	const photosDj = (dj.photos as Record<string, string> | undefined) ?? null;
 	const themeDj = (dj.theme as Record<string, string> | undefined) ?? {};
-	const musicUrl = (dj.music_url as string | null | undefined) ?? null;
+	const venueDj = (dj.venue as Record<string, string> | undefined) ?? null;
+	const socialDj = (dj.social as Record<string, string> | undefined) ?? null;
+	const wishesDj = (dj.wishes as Record<string, unknown> | undefined) ?? null;
+	const musicDj = (dj.music as Record<string, unknown> | undefined) ?? null;
+	const rawMusicUrl = (dj.music_url as string | null | undefined) ?? (musicDj?.src as string | null | undefined) ?? null;
+	const rawYoutubeId = (dj.music_youtube_id as string | undefined) ?? (musicDj?.youtubeId as string | undefined) ?? null;
+	const rawStartSeconds = (dj.music_start_seconds as number | string | undefined) ?? (musicDj?.startSeconds as number | string | undefined) ?? null;
+	const instagramFilterRaw = (dj.instagram_filter_url as string | null | undefined) ?? (dj.instagramFilterUrl as string | null | undefined) ?? null;
+	const giftNoteRaw = (dj.gift_note as string | undefined) ?? ((dj.gift as Record<string, string> | undefined)?.note as string | undefined) ?? null;
 	const storyIntro = (dj.love_story_intro as string | undefined) ?? null;
 	const storyDj = Array.isArray(dj.love_story) ? (dj.love_story as { title?: string; text?: string }[]) : null;
 	const livestream = (dj.livestream_url as string | null | undefined) ?? null;
@@ -69,15 +77,36 @@ export function resolveWedding(dataJson: Record<string, unknown> | null | undefi
 	if (story.chapters.length === 0) story.chapters = wedding.story.chapters;
 
 	const gift = giftsDj.length > 0 ? {
-		note: wedding.gift.note,
+		note: pick(giftNoteRaw, wedding.gift.note),
 		accounts: giftsDj.filter((g) => g.number?.trim()).map((g) => ({ bank: (g.provider ?? 'DANA').toUpperCase(), number: g.number!.trim(), holder: g.owner ?? '' }))
 	} : wedding.gift;
+
+	const social = {
+		whatsapp: socialDj?.whatsapp ?? wedding.social.whatsapp,
+		instagram: socialDj?.instagram ?? wedding.social.instagram
+	};
+
+	const wishes = {
+		minName: typeof wishesDj?.minName === 'number' ? wishesDj.minName : wedding.wishes.minName,
+		minMessage: typeof wishesDj?.minMessage === 'number' ? wishesDj.minMessage : wedding.wishes.minMessage,
+		note: typeof wishesDj?.note === 'string' && (wishesDj.note as string).trim() ? (wishesDj.note as string) : wedding.wishes.note
+	};
+
+	const instagramFilterUrl = pick(instagramFilterRaw, wedding.instagramFilterUrl);
 
 	const namesShort = bride.name && groom.name ? `${bride.name} & ${groom.name}` : wedding.namesShort;
 
 	let akad = wedding.akad;
 	let resepsi = wedding.resepsi;
 	let venue = wedding.venue;
+	if (venueDj) {
+		const mapsUrl = (venueDj.maps_url ?? venueDj.mapsUrl ?? wedding.venue.mapsUrl) as string;
+		venue = {
+			name: pick(venueDj.name, wedding.venue.name),
+			address: pick(venueDj.address, wedding.venue.address),
+			mapsUrl
+		};
+	}
 	let eventCount = 0;
 	if (eventsDj.length > 0) {
 		const filtered = eventsDj.filter((e) => e.name?.trim() || e.date?.trim());
@@ -99,10 +128,20 @@ export function resolveWedding(dataJson: Record<string, unknown> | null | undefi
 		}
 		const loc = eventsDj.find((e) => e.location?.trim())?.location?.trim();
 		const murl = eventsDj.find((e) => e.map_url?.trim())?.map_url?.trim();
-		if (loc || murl) venue = { name: loc ? loc.split(',')[0].slice(0, 80) : wedding.venue.name, address: loc ?? wedding.venue.address, mapsUrl: murl ?? wedding.venue.mapsUrl };
+		if ((loc || murl) && !venueDj) venue = { name: loc ? loc.split(',')[0].slice(0, 80) : wedding.venue.name, address: loc ?? wedding.venue.address, mapsUrl: murl ?? wedding.venue.mapsUrl };
 	}
 
-	const music = musicUrl !== null ? { src: musicUrl, youtubeId: '', startSeconds: wedding.music.startSeconds } : wedding.music;
+	const music =
+		rawMusicUrl !== null
+			? {
+					src: rawMusicUrl,
+					youtubeId: rawYoutubeId ?? '',
+					startSeconds:
+						rawStartSeconds != null && Number.isFinite(Number(rawStartSeconds))
+							? Number(rawStartSeconds)
+							: wedding.music.startSeconds
+				}
+			: wedding.music;
 
 	let calendarUrlResolved = defaultCalendarUrl;
 	try {
@@ -122,6 +161,7 @@ export function resolveWedding(dataJson: Record<string, unknown> | null | undefi
 	return {
 		...wedding,
 		bride, groom, namesShort, verse: verse as typeof wedding.verse, photos, story, gift, akad, resepsi, venue, music: music as typeof wedding.music,
+		social, wishes, instagramFilterUrl,
 		siteTitle: `The Wedding of ${namesShort}`,
 		resolved: true,
 		eventCount,
