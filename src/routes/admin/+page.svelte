@@ -36,13 +36,28 @@
 	let copied = $state<string | null>(null);
 
 	let selected = $state<string | null>(null);
-	let tab = $state<'overview' | 'tamu' | 'ucapan' | 'foto'>('overview');
+	let tab = $state<'overview' | 'tamu' | 'ucapan' | 'foto' | 'konten'>('overview');
 	let detailGuests = $state<GuestRow[]>([]);
 	let detailWishes = $state<WishRow[]>([]);
 	let detailLoading = $state(false);
 	let uploadBusy = $state(false);
 	let uploadMsg = $state('');
 	let exportType = $state<'tamu' | 'ucapan'>('tamu');
+
+	let kontenSaving = $state(false);
+	let kontenMsg = $state('');
+	let kontenEvents = $state<{ name: string; date: string; time: string; location: string; map_url: string }[]>([]);
+	let kontenGifts = $state<{ type: string; provider: string; owner: string; number: string }[]>([]);
+	let kontenBride = $state({ name: '', full_name: '', relation: '', instagram: '', whatsapp: '' });
+	let kontenGroom = $state({ name: '', full_name: '', relation: '', instagram: '', whatsapp: '' });
+	let kontenVerse = $state({ arabic: '', translation: '', source: '' });
+	let kontenVerseOff = $state(false);
+	let kontenThemePrimary = $state('#8b5e3c');
+	let kontenThemeSecondary = $state('#f5ebe0');
+	let kontenMusic = $state('');
+	let kontenLivestream = $state('');
+	let kontenStoryIntro = $state('');
+	let kontenStoryChapters = $state<{ title: string; text: string }[]>([]);
 
 	let showForm = $state(false);
 	let editing = $state<string | null>(null);
@@ -189,6 +204,28 @@
 		return `/${sd}`;
 	}
 
+	function hydrateKonten(it: InvitationItem) {
+		const dj = (it.dataJson ?? {}) as Record<string, unknown>;
+		const ev = Array.isArray(dj.events) ? (dj.events as typeof kontenEvents) : [];
+		kontenEvents = ev.map((e) => ({ name: e.name ?? '', date: e.date ?? '', time: e.time ?? '', location: e.location ?? '', map_url: e.map_url ?? '' }));
+		const gf = Array.isArray(dj.gifts) ? (dj.gifts as typeof kontenGifts) : [];
+		kontenGifts = gf.map((g) => ({ type: g.type ?? 'bank', provider: g.provider ?? '', owner: g.owner ?? '', number: g.number ?? '' }));
+		const cp = (dj.couple as Record<string, Record<string, string>> | undefined) ?? {};
+		kontenBride = { name: cp.bride?.name ?? '', full_name: cp.bride?.full_name ?? '', relation: cp.bride?.relation ?? '', instagram: cp.bride?.instagram ?? '', whatsapp: cp.bride?.whatsapp ?? '' };
+		kontenGroom = { name: cp.groom?.name ?? '', full_name: cp.groom?.full_name ?? '', relation: cp.groom?.relation ?? '', instagram: cp.groom?.instagram ?? '', whatsapp: cp.groom?.whatsapp ?? '' };
+		const vs = (dj.verse as Record<string, string> | null | undefined) ?? null;
+		if (!vs) { kontenVerseOff = true; kontenVerse = { arabic: '', translation: '', source: '' }; } else { kontenVerseOff = false; kontenVerse = { arabic: vs.arabic ?? '', translation: vs.translation ?? '', source: vs.source ?? '' }; }
+		const th = (dj.theme as Record<string, string> | undefined) ?? {};
+		kontenThemePrimary = th.primary ?? '#8b5e3c';
+		kontenThemeSecondary = th.secondary ?? '#f5ebe0';
+		kontenMusic = (dj.music_url as string) ?? '';
+		kontenLivestream = (dj.livestream_url as string) ?? '';
+		kontenStoryIntro = (dj.love_story_intro as string) ?? ((dj.love_story as unknown[]) ? '' : '');
+		const ls = Array.isArray(dj.love_story) ? (dj.love_story as { title: string; text: string }[]) : [];
+		kontenStoryChapters = ls.map((c) => ({ title: c.title ?? '', text: c.text ?? '' }));
+		kontenMsg = '';
+	}
+
 	async function openDetail(sd: string, t: typeof tab = 'overview') {
 		selected = sd;
 		tab = t;
@@ -206,12 +243,45 @@
 				const j = await wRes.json();
 				detailWishes = j.wishes ?? [];
 			} else detailWishes = [];
+			const it = items.find((x) => x.subdomain === sd);
+			if (it) hydrateKonten(it);
 		} catch {
 			detailGuests = [];
 			detailWishes = [];
 		} finally {
 			detailLoading = false;
 		}
+	}
+
+	async function saveKonten() {
+		if (!selected) return;
+		kontenSaving = true;
+		kontenMsg = '';
+		try {
+			const it = items.find((x) => x.subdomain === selected);
+			const cur = (it?.dataJson ?? {}) as Record<string, unknown>;
+			const next: Record<string, unknown> = {
+				...cur,
+				theme: { primary: kontenThemePrimary, secondary: kontenThemeSecondary },
+				events: kontenEvents.filter((e) => e.name.trim() || e.date.trim()),
+				gifts: kontenGifts.filter((g) => g.number.trim()),
+				couple: { bride: { ...kontenBride }, groom: { ...kontenGroom } },
+				verse: kontenVerseOff ? null : { arabic: kontenVerse.arabic, translation: kontenVerse.translation, source: kontenVerse.source },
+				music_url: kontenMusic.trim() || null,
+				livestream_url: kontenLivestream.trim() || null,
+				love_story: kontenStoryChapters.filter((c) => c.title.trim() || c.text.trim()),
+				love_story_intro: kontenStoryIntro
+			};
+			const res = await fetch(`/api/admin/invitations?subdomain=${encodeURIComponent(selected)}`, {
+				method: 'PATCH',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ dataJson: next })
+			});
+			const j = await res.json().catch(() => null);
+			if (!res.ok) { kontenMsg = j?.message ?? 'Gagal menyimpan.'; return; }
+			if (it) it.dataJson = j.item.dataJson ?? next;
+			kontenMsg = 'Tersimpan.';
+		} catch { kontenMsg = 'Gagal menyimpan.'; } finally { kontenSaving = false; }
 	}
 
 	async function deleteWish(id: number) {
@@ -223,6 +293,34 @@
 			return;
 		}
 		detailWishes = detailWishes.filter((w) => w.id !== id);
+	}
+
+	function currentGallery(): string[] {
+		const it = items.find((x) => x.subdomain === selected);
+		const dj = (it?.dataJson ?? {}) as Record<string, unknown>;
+		return Array.isArray(dj.gallery) ? (dj.gallery as string[]) : [];
+	}
+	async function deleteGalleryUrl(url: string) {
+		if (!selected) return;
+		if (!confirm('Hapus foto ini dari galeri?')) return;
+		const res = await fetch(`/api/admin/upload?slug=${encodeURIComponent(selected)}&url=${encodeURIComponent(url)}`, { method: 'DELETE' });
+		const j = await res.json().catch(() => null);
+		if (!res.ok) { uploadMsg = j?.message ?? 'Gagal menghapus.'; return; }
+		const it = items.find((x) => x.subdomain === selected);
+		if (it) it.dataJson = { ...(it.dataJson ?? {}), gallery: j.gallery ?? currentGallery().filter((u) => u !== url) };
+		uploadMsg = 'Foto dihapus.';
+	}
+	async function moveGallery(idx: number, dir: -1 | 1) {
+		if (!selected) return;
+		const arr = [...currentGallery()];
+		const j = idx + dir;
+		if (j < 0 || j >= arr.length) return;
+		[arr[idx], arr[j]] = [arr[j], arr[idx]];
+		const res = await fetch(`/api/admin/upload?slug=${encodeURIComponent(selected)}&reorder=${encodeURIComponent(JSON.stringify(arr))}`, { method: 'DELETE' });
+		const rj = await res.json().catch(() => null);
+		if (!res.ok) { uploadMsg = rj?.message ?? 'Gagal reorder.'; return; }
+		const it = items.find((x) => x.subdomain === selected);
+		if (it) it.dataJson = { ...(it.dataJson ?? {}), gallery: rj.gallery ?? arr };
 	}
 
 	async function uploadFiles(e: Event) {
@@ -352,6 +450,7 @@
 					<button class:active={tab === 'tamu'} onclick={() => openDetail(selected!, 'tamu')}><Users size={13} /> Tamu ({detailGuests.length})</button>
 					<button class:active={tab === 'ucapan'} onclick={() => openDetail(selected!, 'ucapan')}><MessageCircle size={13} /> Ucapan ({detailWishes.length})</button>
 					<button class:active={tab === 'foto'} onclick={() => (tab = 'foto')}><Upload size={13} /> Foto</button>
+					<button class:active={tab === 'konten'} onclick={() => (tab = 'konten')}>Konten</button>
 				</div>
 
 				{#if detailLoading}
@@ -396,13 +495,94 @@
 					</div>
 				{:else if tab === 'foto'}
 					<div class="upload">
-						<p class="hint">Upload ke Supabase Storage bucket <code>invitation-photos/{selected}/</code> (Public). Butuh env <code>SUPABASE_URL</code> + <code>SUPABASE_SECRET_KEY</code>.</p>
+						<p class="hint">Upload ke Supabase Storage bucket <code>invitation-photos/{selected}/</code> (Public, auto-kompresi 1600px JPEG). Butuh env <code>SUPABASE_URL</code> + <code>SUPABASE_SECRET_KEY</code>.</p>
 						<label class="btn btn-green">
 							<Upload size={14} /> Pilih Foto (max 12)
 							<input type="file" accept="image/*" multiple hidden onchange={uploadFiles} disabled={uploadBusy} />
 						</label>
 						{#if uploadMsg}<p class="muted">{uploadMsg}</p>{/if}
 						{#if uploadBusy}<p class="muted">Mengupload…</p>{/if}
+						{#if currentGallery().length > 0}
+							<div class="gallery-grid">
+								{#each currentGallery() as url, i}
+									<div class="gcell">
+										<img src={url} alt={`Foto ${i + 1}`} loading="lazy" />
+										<div class="gact">
+											<button class="ic sm" onclick={() => moveGallery(i, -1)} disabled={i === 0} title="Naik">↑</button>
+											<button class="ic sm" onclick={() => moveGallery(i, 1)} disabled={i === currentGallery().length - 1} title="Turun">↓</button>
+											<button class="ic danger sm" onclick={() => deleteGalleryUrl(url)} title="Hapus"><Trash2 size={12} /></button>
+										</div>
+									</div>
+								{/each}
+							</div>
+						{:else}
+							<p class="muted">Belum ada foto galeri.</p>
+						{/if}
+					</div>
+				{:else if tab === 'konten'}
+					<div class="konten">
+						<p class="hint">Edit <code>data_json</code> generik (events, gifts, couple, ayat, story, theme, musik). Simpan menimpa DB; preview di <code>/{selected}</code>.</p>
+						<h3>Events ({kontenEvents.length})</h3>
+						{#each kontenEvents as ev, i}
+							<div class="konten-row">
+								<input placeholder="Nama (Akad/Resepsi)" bind:value={kontenEvents[i].name} />
+								<input type="date" bind:value={kontenEvents[i].date} />
+								<input placeholder="Jam (08.00 WIB)" bind:value={kontenEvents[i].time} />
+								<input placeholder="Lokasi" bind:value={kontenEvents[i].location} />
+								<input placeholder="Maps URL" bind:value={kontenEvents[i].map_url} />
+								<button class="ic danger sm" onclick={() => (kontenEvents = kontenEvents.filter((_, j) => j !== i))}><Trash2 size={12} /></button>
+							</div>
+						{/each}
+						<button class="btn btn-ghost sm" onclick={() => (kontenEvents = [...kontenEvents, { name: '', date: '', time: '', location: '', map_url: '' }])}><Plus size={12} /> Tambah Acara</button>
+
+						<h3>Gifts ({kontenGifts.length})</h3>
+						{#each kontenGifts as g, i}
+							<div class="konten-row">
+								<select bind:value={kontenGifts[i].type}><option value="bank">bank</option><option value="ewallet">ewallet</option></select>
+								<input placeholder="Provider (DANA/BCA)" bind:value={kontenGifts[i].provider} />
+								<input placeholder="Pemilik" bind:value={kontenGifts[i].owner} />
+								<input placeholder="No. rekening" bind:value={kontenGifts[i].number} />
+								<button class="ic danger sm" onclick={() => (kontenGifts = kontenGifts.filter((_, j) => j !== i))}><Trash2 size={12} /></button>
+							</div>
+						{/each}
+						<button class="btn btn-ghost sm" onclick={() => (kontenGifts = [...kontenGifts, { type: 'ewallet', provider: 'DANA', owner: '', number: '' }])}><Plus size={12} /> Tambah Gift</button>
+
+						<h3>Mempelai</h3>
+						<div class="grid2"><label><span>Bride name</span><input bind:value={kontenBride.name} /></label><label><span>Bride full_name</span><input bind:value={kontenBride.full_name} /></label></div>
+						<label><span>Bride relation</span><textarea rows="2" bind:value={kontenBride.relation}></textarea></label>
+						<div class="grid2"><label><span>Bride IG</span><input bind:value={kontenBride.instagram} /></label><label><span>Bride WA</span><input bind:value={kontenBride.whatsapp} /></label></div>
+						<div class="grid2"><label><span>Groom name</span><input bind:value={kontenGroom.name} /></label><label><span>Groom full_name</span><input bind:value={kontenGroom.full_name} /></label></div>
+						<label><span>Groom relation</span><textarea rows="2" bind:value={kontenGroom.relation}></textarea></label>
+						<div class="grid2"><label><span>Groom IG</span><input bind:value={kontenGroom.instagram} /></label><label><span>Groom WA</span><input bind:value={kontenGroom.whatsapp} /></label></div>
+
+						<h3>Ayat</h3>
+						<label class="chk"><input type="checkbox" checked={!kontenVerseOff} onchange={(e) => (kontenVerseOff = !(e.target as HTMLInputElement).checked)} /> Tampilkan ayat</label>
+						{#if !kontenVerseOff}
+							<label><span>Arabic</span><textarea rows="2" bind:value={kontenVerse.arabic}></textarea></label>
+							<label><span>Terjemahan</span><textarea rows="3" bind:value={kontenVerse.translation}></textarea></label>
+							<label><span>Sumber</span><input bind:value={kontenVerse.source} /></label>
+						{/if}
+
+						<h3>Love Story</h3>
+						<label><span>Intro</span><textarea rows="2" bind:value={kontenStoryIntro}></textarea></label>
+						{#each kontenStoryChapters as ch, i}
+							<div class="konten-row">
+								<input placeholder="Judul" bind:value={kontenStoryChapters[i].title} />
+								<textarea placeholder="Teks" rows="2" bind:value={kontenStoryChapters[i].text}></textarea>
+								<button class="ic danger sm" onclick={() => (kontenStoryChapters = kontenStoryChapters.filter((_, j) => j !== i))}><Trash2 size={12} /></button>
+							</div>
+						{/each}
+						<button class="btn btn-ghost sm" onclick={() => (kontenStoryChapters = [...kontenStoryChapters, { title: '', text: '' }])}><Plus size={12} /> Tambah Bab</button>
+
+						<h3>Tema & Media</h3>
+						<div class="grid2"><label><span>Primary</span><input type="color" bind:value={kontenThemePrimary} /></label><label><span>Secondary</span><input type="color" bind:value={kontenThemeSecondary} /></label></div>
+						<label><span>Music URL</span><input placeholder="/audio/wedding.mp3 atau https://..." bind:value={kontenMusic} /></label>
+						<label><span>Livestream URL</span><input bind:value={kontenLivestream} /></label>
+
+						<div class="modal-actions">
+							<button class="btn btn-green" onclick={saveKonten} disabled={kontenSaving}>{kontenSaving ? 'Menyimpan…' : 'Simpan Konten'}</button>
+						</div>
+						{#if kontenMsg}<p class={kontenMsg === 'Tersimpan.' ? 'muted' : 'err'}>{kontenMsg}</p>{/if}
 					</div>
 				{/if}
 			</div>
@@ -720,5 +900,93 @@
 		margin: 0;
 		font-size: 11px;
 		color: var(--ink-3);
+	}
+	.gallery-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+		gap: 0.6rem;
+		margin-top: 0.6rem;
+	}
+	.gcell {
+		border: 1px solid var(--line);
+		border-radius: 10px;
+		overflow: hidden;
+		background: var(--paper);
+	}
+	.gcell img {
+		width: 100%;
+		aspect-ratio: 1;
+		object-fit: cover;
+		display: block;
+	}
+	.gact {
+		display: flex;
+		gap: 0.25rem;
+		padding: 0.35rem;
+		justify-content: center;
+	}
+	.ic.sm {
+		width: 28px;
+		height: 28px;
+		font-size: 13px;
+	}
+	.konten {
+		display: grid;
+		gap: 0.9rem;
+	}
+	.konten h3 {
+		margin: 1.1rem 0 0.3rem;
+		font-size: 14px;
+		color: var(--ink);
+	}
+	.konten-row {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.5rem;
+		align-items: start;
+		border: 1px solid var(--line-soft);
+		border-radius: 10px;
+		padding: 0.6rem;
+	}
+	@media (min-width: 560px) {
+		.konten-row {
+			grid-template-columns: 1fr 1fr 1fr auto;
+		}
+	}
+	.konten-row input,
+	.konten-row select,
+	.konten-row textarea {
+		width: 100%;
+		border: 1px solid var(--line);
+		border-radius: 8px;
+		padding: 0.45em 0.65em;
+		font-size: 13px;
+		box-sizing: border-box;
+	}
+	.chk {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4em;
+		font-size: 13px;
+		color: var(--ink-2);
+	}
+	.konten label span {
+		display: block;
+		font-size: 11px;
+		font-weight: 600;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--ink-2);
+		margin-bottom: 0.25rem;
+	}
+	.konten label input,
+	.konten label textarea,
+	.konten label select {
+		width: 100%;
+		border: 1px solid var(--line);
+		border-radius: 8px;
+		padding: 0.55em 0.8em;
+		font-size: 13px;
+		box-sizing: border-box;
 	}
 </style>

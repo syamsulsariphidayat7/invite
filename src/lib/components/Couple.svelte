@@ -5,6 +5,9 @@
 	import Photo from './Photo.svelte';
 	import Ornament from './Ornament.svelte';
 	import BatikTexture from './BatikTexture.svelte';
+
+	let { weddingData = null }: { weddingData?: typeof wedding | null } = $props();
+	const w = $derived((weddingData ?? wedding) as typeof wedding);
 </script>
 
 <section id="couple" class="couple" aria-label="Pasangan mempelai">
@@ -14,19 +17,19 @@
 			<div class="photo-wrap" data-reveal="zoom" style="--d:.15s">
 				<span class="side-label bride" aria-hidden="true" data-reveal style="--d:.06s">THE BRIDE</span>
 				<div class="photo-frame">
-					<Photo base={wedding.photos.bride} alt={`Foto ${wedding.bride.name}`} eager />
+					<Photo base={w.photos.bride} alt={`Foto ${w.bride.name}`} eager />
 					<span class="photo-ring" aria-hidden="true"></span>
 					<div class="photo-caption">
-						<h2 class="caption-name" data-reveal style="--d:.18s">{wedding.bride.name}</h2>
-						<p class="caption-relation" data-reveal style="--d:.26s">{@html wedding.bride.relation.replace(/\n/g, '<br />')}</p>
+						<h2 class="caption-name" data-reveal style="--d:.18s">{w.bride.name}</h2>
+						<p class="caption-relation" data-reveal style="--d:.26s">{@html w.bride.relation.replace(/\n/g, '<br />')}</p>
 						<div class="socials socials--overlay" data-reveal style="--d:.34s">
-							{#if wedding.bride.instagram}
-								<a href={wedding.bride.instagram} target="_blank" rel="noopener" aria-label="Instagram">
+							{#if w.bride.instagram}
+								<a href={w.bride.instagram} target="_blank" rel="noopener" aria-label="Instagram">
 									<SocialIcon />
 								</a>
 							{/if}
-							{#if wedding.bride.whatsapp}
-								<a href={wedding.bride.whatsapp} target="_blank" rel="noopener" aria-label="WhatsApp">
+							{#if w.bride.whatsapp}
+								<a href={w.bride.whatsapp} target="_blank" rel="noopener" aria-label="WhatsApp">
 									<MessageCircle size={17} />
 								</a>
 							{/if}
@@ -45,19 +48,19 @@
 			<div class="photo-wrap" data-reveal="zoom" style="--d:.15s">
 				<span class="side-label groom" aria-hidden="true" data-reveal style="--d:.06s">THE GROOM</span>
 				<div class="photo-frame">
-					<Photo base={wedding.photos.groom} alt={`Foto ${wedding.groom.name}`} eager />
+					<Photo base={w.photos.groom} alt={`Foto ${w.groom.name}`} eager />
 					<span class="photo-ring" aria-hidden="true"></span>
 					<div class="photo-caption">
-						<h2 class="caption-name" data-reveal style="--d:.18s">{wedding.groom.name}</h2>
-						<p class="caption-relation" data-reveal style="--d:.26s">{@html wedding.groom.relation.replace(/\n/g, '<br />')}</p>
+						<h2 class="caption-name" data-reveal style="--d:.18s">{w.groom.name}</h2>
+						<p class="caption-relation" data-reveal style="--d:.26s">{@html w.groom.relation.replace(/\n/g, '<br />')}</p>
 						<div class="socials socials--overlay" data-reveal style="--d:.34s">
-							{#if wedding.groom.instagram}
-								<a href={wedding.groom.instagram} target="_blank" rel="noopener" aria-label="Instagram">
+							{#if w.groom.instagram}
+								<a href={w.groom.instagram} target="_blank" rel="noopener" aria-label="Instagram">
 									<SocialIcon />
 								</a>
 							{/if}
-							{#if wedding.groom.whatsapp}
-								<a href={wedding.groom.whatsapp} target="_blank" rel="noopener" aria-label="WhatsApp">
+							{#if w.groom.whatsapp}
+								<a href={w.groom.whatsapp} target="_blank" rel="noopener" aria-label="WhatsApp">
 									<MessageCircle size={17} />
 								</a>
 							{/if}

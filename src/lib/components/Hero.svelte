@@ -4,12 +4,15 @@
 	import Photo from './Photo.svelte';
 	import Particles from './Particles.svelte';
 
-	const heroNames = wedding.namesShort.split(' & ');
+	let { weddingData = null }: { weddingData?: typeof wedding | null } = $props();
+	const w = $derived((weddingData ?? wedding) as typeof wedding & { calendarUrlResolved?: string });
+	const heroNames = $derived(w.namesShort.split(' & '));
+	const calUrl = $derived((w as unknown as Record<string, string>).calendarUrlResolved ?? calendarUrl);
 </script>
 
 <section id="home" class="hero" aria-label="Pembukaan undangan">
 	<div class="bg">
-		<Photo base={wedding.photos.hero} alt="Foto pasangan Ruhaeni & Roni" eager />
+		<Photo base={w.photos.hero} alt={`Foto pasangan ${w.namesShort}`} eager />
 	</div>
 	<div class="veil"></div>
 
@@ -32,10 +35,10 @@
 		<h1 class="names" data-reveal style="--d:.08s">
 			<span class="n">{heroNames[0]}</span><span class="amp">&</span><span class="n">{heroNames[1] ?? ''}</span>
 		</h1>
-		<p class="date" data-reveal style="--d:.16s">{wedding.resepsi.dayLabel}</p>
+		<p class="date" data-reveal style="--d:.16s">{w.resepsi.dayLabel}</p>
 
 		<div class="cta" data-reveal style="--d:.24s">
-			<a class="btn-save" href={calendarUrl} target="_blank" rel="noopener">
+			<a class="btn-save" href={calUrl} target="_blank" rel="noopener">
 				<CalendarPlus size={17} />
 				Save The Date
 			</a>

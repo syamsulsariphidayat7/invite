@@ -2,6 +2,9 @@
 	import { wedding } from '$lib/data/wedding';
 	import Ornament from './Ornament.svelte';
 	import BatikTexture from './BatikTexture.svelte';
+
+	let { weddingData = null }: { weddingData?: typeof wedding | null } = $props();
+	const w = $derived((weddingData ?? wedding) as typeof wedding);
 </script>
 
 <footer class="footer">
@@ -10,8 +13,8 @@
 		<Ornament tone="light" />
 
 		<p class="the-wedding" data-reveal>The Wedding Of</p>
-		<p class="names" data-reveal style="--d:.06s">{wedding.namesShort}</p>
-		<p class="date" data-reveal style="--d:.12s">{wedding.resepsi.dayLabel}</p>
+		<p class="names" data-reveal style="--d:.06s">{w.namesShort}</p>
+		<p class="date" data-reveal style="--d:.12s">{w.resepsi.dayLabel}</p>
 
 		<p class="closing" data-reveal style="--d:.18s">
 			Merupakan suatu kehormatan & kebahagiaan bagi kami apabila Bapak/Ibu/Saudara/i berkenan hadir
@@ -20,7 +23,7 @@
 		<p class="apology" data-reveal style="--d:.24s">Mohon maaf apabila ada kesalahan penulisan nama & gelar.</p>
 
 		<div class="bottom" data-reveal style="--d:.30s">
-			<p>© 2026 {wedding.namesShort}</p>
+			<p>© 2026 {w.namesShort}</p>
 			<p class="credit"><a href="http://boundless.my.id/" target="_blank" rel="noopener">Boundless</a></p>
 		</div>
 	</div>

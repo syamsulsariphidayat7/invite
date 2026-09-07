@@ -3,7 +3,10 @@
 	import Ornament from './Ornament.svelte';
 	import BatikTexture from './BatikTexture.svelte';
 
-	const chapters = wedding.story.chapters;
+	let { weddingData = null }: { weddingData?: typeof wedding | null } = $props();
+	const w = $derived((weddingData ?? wedding) as typeof wedding);
+	const chapters = $derived(w.story.chapters);
+	const intro = $derived(w.story.intro);
 </script>
 
 <section class="story" aria-label="Kisah cinta kami">
@@ -12,7 +15,7 @@
 		<p class="kicker" data-reveal>Love Story</p>
 		<h2 class="section-title" data-reveal style="--d:.06s">The Memorable Moments</h2>
 		<Ornament tone="green" />
-		<p class="intro" data-reveal style="--d:.1s">{wedding.story.intro}</p>
+		<p class="intro" data-reveal style="--d:.1s">{intro}</p>
 	</div>
 
 	<div class="timeline wrap-wide">

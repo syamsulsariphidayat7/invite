@@ -86,15 +86,15 @@
 </script>
 
 <main class="invite">
-	<Hero />
-	<Couple />
-	<Verse />
-	<Events />
+	<Hero weddingData={data.resolved} />
+	<Couple weddingData={data.resolved} />
+	<Verse weddingData={data.resolved} />
+	<Events weddingData={data.resolved} />
 	<Gallery gallery={data.gallery} />
-	<LoveStory />
-	<Gift />
+	<LoveStory weddingData={data.resolved} />
+	<Gift weddingData={data.resolved} />
 	<Wishes initialWishes={data.wishes} initialTotal={data.total} guestName={guest} />
-	<Footer />
+	<Footer weddingData={data.resolved} />
 </main>
 
 {#if overlayVisible}
@@ -103,4 +103,4 @@
 
 <ScrollProgress />
 <BottomNav />
-<MusicToggle />
+	<MusicToggle weddingData={data.resolved} />

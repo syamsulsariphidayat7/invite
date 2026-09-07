@@ -5,8 +5,13 @@
 	import Ornament from './Ornament.svelte';
 	import BatikTexture from './BatikTexture.svelte';
 
-	const showAkad = false;
-	const target = new Date((showAkad ? wedding.akad : wedding.resepsi).dateISO).getTime();
+	let { weddingData = null }: { weddingData?: typeof wedding | null } = $props();
+	const w = $derived((weddingData ?? wedding) as typeof wedding);
+
+	type RW = typeof wedding & { resolved?: boolean; eventCount?: number };
+	const r = $derived(w as unknown as RW);
+	const showAkad = $derived((r.eventCount ?? 0) >= 2);
+	const target = $derived(new Date((showAkad ? r.akad : r.resepsi).dateISO).getTime());
 
 	let left = $state({ d: 0, h: 0, m: 0, s: 0 });
 	let countdownRef: HTMLDivElement | null = $state(null);
@@ -45,10 +50,10 @@
 
 	const pad = (n: number) => String(n).padStart(2, '0');
 
-	const events = (showAkad ? [wedding.akad, wedding.resepsi] : [wedding.resepsi]).map((e) => ({
+	const events = $derived((showAkad ? [r.akad, r.resepsi] : [r.resepsi]).map((e) => ({
 		...e,
-		icon: e === wedding.akad ? 'akad' : 'resepsi'
-	}));
+		icon: e === r.akad ? 'akad' : 'resepsi'
+	})));
 </script>
 
 <section id="event" class="events" aria-label="Jadwal acara">
@@ -66,7 +71,7 @@
 		<p class="lead" data-reveal style="--d:.12s">
 			Mohon doa & restunya untuk acara yang akan diselenggarakan pada:
 		</p>
-		<p class="big-date" data-reveal style="--d:.18s">{(showAkad ? wedding.akad : wedding.resepsi).dayLabel}</p>
+		<p class="big-date" data-reveal style="--d:.18s">{(showAkad ? r.akad : r.resepsi).dayLabel}</p>
 
 		<div class="countdown" data-reveal style="--d:.24s">
 			{#each units as u}
@@ -96,11 +101,11 @@
 				<p class="time"><Clock size={14} /> {ev.time}</p>
 
 				<div class="venue">
-					<p class="venue-name"><MapPin size={15} /> {wedding.venue.name}</p>
-					<p class="address">{wedding.venue.address}</p>
+					<p class="venue-name"><MapPin size={15} /> {r.venue.name}</p>
+					<p class="address">{r.venue.address}</p>
 				</div>
 
-				<a class="btn-map" href={wedding.venue.mapsUrl} target="_blank" rel="noopener">
+				<a class="btn-map" href={r.venue.mapsUrl} target="_blank" rel="noopener">
 					<MapPin size={15} />
 					Lihat Map
 				</a>

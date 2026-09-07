@@ -2,6 +2,10 @@
 	import { wedding } from '$lib/data/wedding';
 	import Ornament from './Ornament.svelte';
 	import BatikTexture from './BatikTexture.svelte';
+
+	let { weddingData = null }: { weddingData?: typeof wedding | null } = $props();
+	const w = $derived(((weddingData as typeof wedding | null) ?? wedding) as typeof wedding);
+	const verse = $derived((w as unknown as { verse: typeof wedding.verse | null }).verse);
 </script>
 
 <section class="verse" aria-label="Ayat Al-Qur'an">
@@ -10,12 +14,14 @@
 	<div class="wrap">
 		<Ornament tone="light" />
 
-		<blockquote>
-			<p class="arabic" lang="ar" dir="rtl" data-reveal>{wedding.verse.arabic}</p>
-			<p class="orn-symbol" aria-hidden="true" data-reveal style="--d:.1s">❁</p>
-			<p class="translation" data-reveal style="--d:.18s">“{wedding.verse.translation}”</p>
-			<footer class="source" data-reveal style="--d:.26s">{wedding.verse.source}</footer>
-		</blockquote>
+		{#if verse}
+			<blockquote>
+				<p class="arabic" lang="ar" dir="rtl" data-reveal>{verse.arabic}</p>
+				<p class="orn-symbol" aria-hidden="true" data-reveal style="--d:.1s">❁</p>
+				<p class="translation" data-reveal style="--d:.18s">“{verse.translation}”</p>
+				<footer class="source" data-reveal style="--d:.26s">{verse.source}</footer>
+			</blockquote>
+		{/if}
 
 		<Ornament tone="light" />
 	</div>

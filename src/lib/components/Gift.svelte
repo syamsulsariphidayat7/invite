@@ -4,6 +4,9 @@
 	import Ornament from './Ornament.svelte';
 	import BatikTexture from './BatikTexture.svelte';
 
+	let { weddingData = null }: { weddingData?: typeof wedding | null } = $props();
+	const w = $derived((weddingData ?? wedding) as typeof wedding);
+
 	let copied = $state<Set<number>>(new Set());
 
 	async function copyNumber(i: number, text: string) {
@@ -34,10 +37,10 @@
 	<div class="wrap">
 		<p class="kicker light" data-reveal>Amplop Digital</p>
 		<h2 class="section-title light" data-reveal style="--d:.06s">Wedding Gift</h2>
-		<p class="note" data-reveal style="--d:.12s">{wedding.gift.note}</p>
+		<p class="note" data-reveal style="--d:.12s">{w.gift.note}</p>
 
 		<div class="accounts">
-			{#each wedding.gift.accounts as acc, i}
+			{#each w.gift.accounts as acc, i}
 				<article class="account-card" data-reveal style="--d:{0.15 + i * 0.1}s">
 					<header class="acc-head">
 						<span class="bank-logo" aria-hidden="true">
@@ -81,10 +84,10 @@
 				<h3>Kirim Hadiah</h3>
 				<p>
 					Kirim kado/hadiah fisik ke alamat kami di:<br />
-					<strong>{wedding.venue.name}, {wedding.venue.address}</strong>
+					<strong>{w.venue.name}, {w.venue.address}</strong>
 				</p>
 			</div>
-			<a class="btn-map-light" href={wedding.venue.mapsUrl} target="_blank" rel="noopener">
+			<a class="btn-map-light" href={w.venue.mapsUrl} target="_blank" rel="noopener">
 				Lihat Lokasi
 			</a>
 		</div>

@@ -1,7 +1,11 @@
 import { json, error } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
+import { checkRateLimit, clientKey } from '$lib/server/rateLimit';
 
-export async function POST({ request, cookies }) {
+export async function POST({ request, cookies, getClientAddress }) {
+	const ip = clientKey(request, (() => { try { return getClientAddress(); } catch { return 'unknown'; } })());
+	const rl = checkRateLimit(`admin-login:${ip}`, 5, 15 * 60_000);
+	if (!rl.allowed) error(429, `Terlalu banyak percobaan. Coba lagi ${rl.retryAfter} detik.`);
 	const expected = env.ADMIN_PIN?.trim();
 	if (!expected) error(500, 'ADMIN_PIN belum diset di env.');
 

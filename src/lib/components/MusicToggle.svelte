@@ -3,7 +3,9 @@
 	import { wedding } from '$lib/data/wedding';
 	import { musicState, toggleMusic } from '$lib/music.svelte';
 
-	const enabled = !!((wedding.music as { src?: string }).src || wedding.music.youtubeId);
+	let { weddingData = null }: { weddingData?: typeof wedding | null } = $props();
+	const w = $derived((weddingData ?? wedding) as typeof wedding);
+	const enabled = $derived(!!(((w.music as { src?: string }).src || w.music.youtubeId)));
 	let state = $state({ started: false, playing: false });
 	musicState.subscribe((s) => (state = s));
 </script>
