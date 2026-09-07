@@ -107,7 +107,7 @@
 </main>
 
 {#if overlayVisible}
-	<Overlay {guest} closed={opened} onopen={openInvite} />
+	<Overlay {guest} closed={opened} onopen={openInvite} weddingData={data.resolved} />
 {/if}
 
 <ScrollProgress />

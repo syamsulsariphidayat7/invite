@@ -6,7 +6,7 @@
 //   cukup untuk dev/pratinjau sebelum DATABASE_URL dipasang).
 //
 // Kolom `wedding` menyimpan slug undangan (siap multi-undangan / SaaS multi-tema).
-import postgres from 'postgres';
+import { db } from './db';
 import { env } from '$env/dynamic/private';
 import type { Wish } from '$lib/data/wedding';
 
@@ -30,40 +30,6 @@ let inMemory: Wish[] = [];
 let seq = 1;
 let hasDb: boolean | null = null;
 let initPromise: Promise<boolean> | null = null;
-let sql: postgres.Sql | null = null;
-
-/**
- * Parse DATABASE_URL menjadi config object (bukan via `new URL()` driver).
- * Alasan: password dengan karakter spesial seperti `?` merusak parsing URL
- * (mis. `new URL('postgresql://u:p?ss@host/...')` → Invalid URL). Regex greedy
- * ke `@` terakhir + decode bila ada percent-encoding → tahan karakter apa pun.
- */
-function dbConfigFromUrl(url: string) {
-	const m = url.match(/postgresql:\/\/([^:]+):(.+)@([^:/]+):(\d+)\/([^?\s]+)/);
-	if (!m) return null;
-	let password = m[2];
-	try {
-		if (password.includes('%')) password = decodeURIComponent(password);
-	} catch {
-		/* biarkan apa adanya */
-	}
-	return { user: m[1], password, host: m[3], port: Number(m[4]), database: m[5] };
-}
-
-function db(): postgres.Sql {
-	if (!sql) {
-		const opts = {
-			// Supavisor (transaction pooler) tidak mendukung prepared statements:
-			prepare: false,
-			max: 5,
-			idle_timeout: 20,
-			connect_timeout: 10
-		};
-		const cfg = dbConfigFromUrl(env.DATABASE_URL!);
-		sql = cfg ? postgres({ ...cfg, ...opts }) : postgres(env.DATABASE_URL!, opts);
-	}
-	return sql;
-}
 
 function rowToWish(r: Row): Wish {
 	const raw = r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at);

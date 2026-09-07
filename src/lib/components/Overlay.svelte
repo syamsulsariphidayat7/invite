@@ -4,13 +4,17 @@
 	import Photo from './Photo.svelte';
 	import Ornament from './Ornament.svelte';
 
-	let { guest = '', closed = false, onopen }: { guest?: string; closed?: boolean; onopen?: () => void } =
-		$props();
-
-	const names = wedding.namesShort.split(' & ');
+	let {
+		guest = '',
+		closed = false,
+		onopen,
+		weddingData = null
+	}: { guest?: string; closed?: boolean; onopen?: () => void; weddingData?: typeof wedding | null } = $props();
+	const w = $derived((weddingData ?? wedding) as typeof wedding);
+	const names = $derived(w.namesShort.split(' & '));
 </script>	<div class="cover" class:hide={closed} aria-hidden={closed ? 'true' : undefined} role="dialog" aria-modal="true" tabindex="-1">
 	<div class="bg">
-		<Photo base={wedding.photos.cover} alt="" eager />
+		<Photo base={w.photos.cover} alt="" eager />
 	</div>
 	<div class="veil"></div>
 
@@ -23,7 +27,7 @@
 			<span class="amp">&</span>
 			<span>{names[1]}</span>
 		</h1>
-		<p class="date">{wedding.resepsi.dayLabel}</p>
+		<p class="date">{w.resepsi.dayLabel}</p>
 
 		<Ornament tone="light" />
 

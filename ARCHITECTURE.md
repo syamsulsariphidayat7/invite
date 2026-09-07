@@ -43,8 +43,9 @@ src/
 │  │  ├─ wedding.ts      # KONTEN DEFAULT + tipe (Person, EventDetail, BankAccount, StoryChapter, Wish)
 │  │  └─ resolve.ts      # resolveWedding(dataJson): override konten DB → objek ResolvedWedding
 │  ├─ server/
+│  │  ├─ db.ts           # KONEKSI DB terpusat (postgres.js): dbConfigFromUrl + db() singleton
 │  │  ├─ wishes.ts       # repo ucapan: listWishes/countWishes/addWish (DB/in-memory)
-│  │  ├─ invitations.ts  # repo invitations: CRUD + validateSubdomain + dbConfigFromUrl
+│  │  ├─ invitations.ts  # repo invitations: CRUD + validateSubdomain
 │  │  ├─ guests.ts       # repo invitation_guests: PIN verify, CRUD, auto-create tabel/kolom
 │  │  └─ rateLimit.ts    # checkRateLimit + clientKey (in-memory Map)
 │  └─ components/        # satu komponen per section (lihat §6)
@@ -132,7 +133,7 @@ personalize_greeting: boolean
 
 | Komponen | Konten | Props |
 |---|---|---|
-| Overlay | sampul "Buka Undangan" | guest, closed, onopen — ⚠️ masih pakai `wedding` statis |
+| Overlay | sampul "Buka Undangan" | guest, closed, onopen, weddingData (cover/nama/tanggal ikut per-undangan) |
 | Hero | foto, nama, tanggal, Save-the-Date, partikel | weddingData |
 | Couple | 2 mempelai + sosmed (relation di-escape anti-XSS) | weddingData |
 | Verse | ayat Al-Qur'an | weddingData |
@@ -175,8 +176,8 @@ Pola konsisten: `weddingData` prop + `const w = $derived((weddingData ?? wedding
 
 ## 9. Temuan / Catatan (dari pemindaian)
 
-1. **Duplikasi koneksi DB**: `dbConfigFromUrl()`+`db()` diulang di 4 file (`wishes.ts`, `invitations.ts`, `guests.ts`, `api/admin/wishes/+server.ts`) → kandidat refactor ke `src/lib/server/db.ts`.
-2. **Overlay belum memakai `weddingData`** — cover/teks sampul tetap dari `wedding.ts` walau `photos.cover` sudah diresolve per-undangan (gap kecil vs fitur cover admin).
+1. ~~Duplikasi koneksi DB~~ ✅ **Sudah di-refactor** (2026-09-07): `src/lib/server/db.ts` terpusat, 4 file konsumen dipindah (wishes, invitations, guests, api/admin/wishes).
+2. ~~Overlay pakai `wedding` statis~~ ✅ **Sudah di-update** (2026-09-07): menerima `weddingData`, cover/nama/tanggal sampul ikut per-undangan.
 3. **Dua sistem kelola tamu**: `/tamu` (legacy localStorage, hardcoded slug) vs `/[slug]/kelola` (DB, multi-tenant) — legacy bisa dihapus saat sudah yakin.
 4. **Rate limit in-memory** — reset saat instance restart (cukup untuk 1 instance Vercel; catatan untuk skala).
 5. `vite.config.ts` menyetel `runes: true` global — komponen wajib pola runes.
