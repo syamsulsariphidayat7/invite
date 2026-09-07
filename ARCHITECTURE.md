@@ -56,9 +56,7 @@ src/
    ├─ [slug]/            # halaman undangan dinamis
    │  ├─ +page.server.ts # load: getInvitation + wishes + gallery + resolveWedding
    │  ├─ +page.svelte    # susun komponen, overlay, reveal observer, theme override
-   │  └─ kelola/         # kelola tamu konsumen (PIN 6-digit, bulk WA)
-   ├─ tamu/              # LEGACY kelola tamu (localStorage) — masih aktif
-   ├─ admin/             # panel admin (login + dashboard)
+   │  └─ kelola/         # kelola tamu konsumen (PIN 6-digit, bulk WA)   ├─ admin/             # panel admin (login + dashboard)
    │  └─ login/
    └─ api/
       ├─ health/         # keep-warm (cron Vercel 06:00)
@@ -178,7 +176,7 @@ Pola konsisten: `weddingData` prop + `const w = $derived((weddingData ?? wedding
 
 1. ~~Duplikasi koneksi DB~~ ✅ **Sudah di-refactor** (2026-09-07): `src/lib/server/db.ts` terpusat, 4 file konsumen dipindah (wishes, invitations, guests, api/admin/wishes).
 2. ~~Overlay pakai `wedding` statis~~ ✅ **Sudah di-update** (2026-09-07): menerima `weddingData`, cover/nama/tanggal sampul ikut per-undangan.
-3. **Dua sistem kelola tamu**: `/tamu` (legacy localStorage, hardcoded slug) vs `/[slug]/kelola` (DB, multi-tenant) — legacy bisa dihapus saat sudah yakin.
+3. ~~Dua sistem kelola tamu~~ ✅ **Rute legacy `/tamu` dihapus** (2026-09-07); hanya `/[slug]/kelola` (DB, multi-tenant) yang dipakai.
 4. **Rate limit in-memory** — reset saat instance restart (cukup untuk 1 instance Vercel; catatan untuk skala).
 5. `vite.config.ts` menyetel `runes: true` global — komponen wajib pola runes.
 6. `static/photos/placeholders/` masih ada sebagai fallback Photo (bukan bug).

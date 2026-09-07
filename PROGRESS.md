@@ -35,11 +35,11 @@ Terakhir diperbarui: 2026-09-07
 - Undangan lengkap: layar sampul + musik, hero, mempelai, ayat, countdown, akad & resepsi (20–21 Sep 2026), galeri, love story 3 bab, amplop digital, ucapan tamu → Neon, nav bawah, footer.
 - Verifikasi penuh: `pnpm check` (0 error), `pnpm build` (exit 0), API `/api/wishes` tersimpan & terbaca di Neon, screenshot mobile & desktop.
 - Polish: Hero center + flower-decor, veil abu bottom+halo atas, batik Semen PNG cover no-repeat, font mempelai Great Vibes + `&` flex gap 0.28em, palet abu, reveal Hero/Batik.
-- Dynamic Slug Routing: rute dinamis `/[slug]` (`/ruhaeni-roni`), root `/` auto-redirect ke `/${wedding.slug}`, `/tamu` generator link otomatis ke `/${wedding.slug}?to=...`.
+- Dynamic Slug Routing: rute dinamis `/[slug]` (`/ruhaeni-roni`), root `/` auto-redirect ke `/${wedding.slug}`, link tamu via `?to=...`.
 - Ucapan & Kehadiran: form di atas list, stepper jumlah kehadiran (1-10 orang), pagination 3 ucapan/halaman.
 - Nav & Scroll: sticky top countdown saat scroll, bottom nav active indicator sesuai posisi scroll, scroll progress bar top.
 - Data produksi 2026-09-06: DANA Ruhaeni 085724087380 & Asep Roni 085624398337, IG _ruhaeni & ronii_wiguna, footer link Boundless `http://boundless.my.id/`.
-- Kelola Tamu Konsumen: `/{slug}/kelola` PIN 6-digit per undangan, `api/guests` CRUD + `invitation_guests` (sent/sent_at, dedup normalized_name), `/tamu` legacy tetap; `invitations.access_pin + wa_template`.
+- Kelola Tamu Konsumen: `/{slug}/kelola` PIN 6-digit per undangan, `api/guests` CRUD + `invitation_guests` (sent/sent_at, dedup normalized_name), `invitations.access_pin + wa_template`. Rute legacy `/tamu` dihapus 2026-09-07.
  - Panel Admin `/admin`: login `ADMIN_PIN` env (`hooks.server.ts` + `admin_pin` httpOnly cookie + 5/15 menit rate limit), CRUD `invitations` + tab Konten lengkap `data_json` + gallery manage (hapus/reorder) + upload `invitation-photos/{slug}/` (sharp 1600px) — auto-sync `resolve.ts` ke `/[slug]`.
  - Anti-spam: `rateLimit.ts` in-memory (`wishes` 6/min/IP, `guests` 20/min/IP/slug, `admin-login` 5/15m) + honeypot `website` (silent 201).
  - WA Mass-share: `/{slug}/kelola` bulk checkbox, pilih semua filtered, salin link massal, kirim WA berurutan + auto tandai terkirim.
