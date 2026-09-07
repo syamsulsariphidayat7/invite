@@ -23,7 +23,7 @@ Terakhir diperbarui: 2026-09-07
 | Sharp Kompresi | ✅ Selesai — upload auto-resize 1600px JPEG 82 mozjpeg, gallery hapus/reorder |
 | Login Rate Limit | ✅ Selesai — `admin-login` 5/15 menit |
 | dataJson Wiring | ✅ Selesai — `resolve.ts` override penuh ke `/[slug]`: gift.note, venue, social, wishes, instagramFilterUrl, music youtubeId/startSeconds, photos cover |
-| Turnstile meta | ✅ Kode siap — `+layout.server.ts` ekspos `TURNSTILE_SITE_KEY` → `<meta name=turnstile-sitekey>`; Wishes API wajib token bila `TURNSTILE_SECRET_KEY` terisi. ⏳ env belum diisi |
+| Turnstile captcha | ✅ Aktif & terverifikasi (2026-09-07) — env terisi di Vercel & lokal; POST tanpa token → 400 wajib, token palsu → 400 gagal (siteverify jalan) |
 | Anti-XSS | ✅ Selesai — `@html` relation Couple di-escape dulu (`safeRelation`), input admin tidak bisa injeksi HTML |
 | Pre-production Cleanup | ✅ Selesai |
 | Deployment (Vercel + Neon) | ✅ Selesai — auto-deploy dari GitHub, custom domain `invite.boundless.my.id`, `DATABASE_URL` aktif (API ucapan 200 + data terbaca, 2026-09-06) |
@@ -55,7 +55,8 @@ Terakhir diperbarui: 2026-09-07
 
 ## Langkah Berikutnya
 1. ✅ Semua fase inti selesai: deploy, domain, foto, musik, slug, kelola tamu, admin, anti-spam, dataJson wiring (commit terbaru `0ea0b38`, terverifikasi live 2026-09-07)
-2. ⏳ **Aktifkan Turnstile**: isi `TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` di Vercel & `.env` (kode sudah siap, meta sudah ter-render di produksi)
-3. ⏳ **Bersihkan**: 1 baris tamu uji di `invitation_guests`; nonaktifkan project Neon lama
-4. ⏳ Fase 6 (multi-layout) — future, butuh keputusan desain
-5. ⏳ Fase 7 (custom domain per klien) — future, opsional
+2. ✅ **Turnstile aktif** — env terisi, produksi memvalidasi captcha (verifikasi 2026-09-07)
+3. ✅ **Bersihkan** — baris tamu uji dihapus (`invitation_guests` = 0); tersisa: nonaktifkan project Neon lama (manual di dashboard)
+4. ⏳ Refactor db.ts + Overlay weddingData — **commit `98d1c4b` lokal, belum di-push**
+5. ⏳ Fase 6 (multi-layout) — future, butuh keputusan desain
+6. ⏳ Fase 7 (custom domain per klien) — future, opsional
