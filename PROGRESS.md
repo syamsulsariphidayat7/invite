@@ -27,6 +27,7 @@ Terakhir diperbarui: 2026-09-07
 | Fase 6 multi-layout | ✅ Tahap 1 — registry `src/lib/layouts/` + extract `classic` + layout baru `rose` + dropdown template di admin + preview `?template=` (noir & botanical menyusul) |
 | Migrasi media → Storage | ✅ (2026-09-07) — 15 foto + musik ruhaeni-roni di Supabase Storage `invitation-photos/ruhaeni-roni/`, `data_json.photos/gallery/music_url` berisi URL publik (script `scripts/migrate-media.mjs`) |
 | Anti-XSS | ✅ Selesai — `@html` relation Couple di-escape dulu (`safeRelation`), input admin tidak bisa injeksi HTML |
+| Fix jsonb PATCH admin | ✅ (2026-09-07) — pola `${JSON.stringify(x)}::jsonb` di postgres.js ter-encode ganda → melanggar CHECK `jsonb_typeof='object'` → semua edit panel admin 500 "Internal Error". Diganti helper `jsonb()` (`sql.json()`) di `db.ts` untuk create+update; trigger `updated_at` dipasang; script migrasi kini bisa re-seed `data_json` (`ON CONFLICT DO UPDATE`) |
 | Pre-production Cleanup | ✅ Selesai |
 | Deployment (Vercel + Neon) | ✅ Selesai — auto-deploy dari GitHub, custom domain `invite.boundless.my.id`, `DATABASE_URL` aktif (API ucapan 200 + data terbaca, 2026-09-06) |
 
@@ -53,6 +54,7 @@ Terakhir diperbarui: 2026-09-07
 - **Data lama Neon dibuang** (keputusan pemilik — 3 ucapan uji tidak diperlukan); Neon tinggal dinonaktifkan/dihapus. Isu password Neon terekspos otomatis moot.
 - **Foto asli sudah terpasang** (Sep 2026): 15 foto di-rename ke nama template — hero, bride, groom, gallery-1..12. Bride/groom sudah dikonfirmasi via file `pria.jpg`/`wanita.jpg` dari user.
 - **Musik latar aktif**: `/audio/wedding.mp3` offline (Christina Perri — A Thousand Years), mulai detik ke-5 (`wedding.ts:music`).
+- **Aturan penulisan JSONB (jangan dilanggar)**: dengan postgres.js, parameter JSONB **wajib** lewat `jsonb()` helper (`sql.json()`) di `src/lib/server/db.ts`. Pola `${JSON.stringify(x)}::jsonb` ter-encode ganda (jsonb_typeof jadi `string`) → melanggar CHECK `invitations_data_json_check` → 500. Sudah diperbaiki di `invitations.ts` (commit `d7b43b6`).
 - **Batik**: `static/batik/batik-semen.png` 600×600 PNG tunggal, `BatikTexture` cover no-repeat 440px 0.16, dark via invert.
 
 ## Langkah Berikutnya

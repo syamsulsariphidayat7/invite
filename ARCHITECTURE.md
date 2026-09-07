@@ -49,7 +49,7 @@ src/
 │  │  ├─ classic/Layout.svelte
 │  │  └─ rose/Layout.svelte
 │  ├─ server/
-│  │  ├─ db.ts           # KONEKSI DB terpusat (postgres.js): dbConfigFromUrl + db() singleton
+│  │  ├─ db.ts           # KONEKSI DB terpusat (postgres.js): dbConfigFromUrl + db() singleton + jsonb() utk parameter JSONB
 │  │  ├─ wishes.ts       # repo ucapan: listWishes/countWishes/addWish (DB/in-memory)
 │  │  ├─ invitations.ts  # repo invitations: CRUD + validateSubdomain
 │  │  ├─ guests.ts       # repo invitation_guests: PIN verify, CRUD, auto-create tabel/kolom
@@ -71,7 +71,7 @@ src/
       └─ admin/          # login, invitations, wishes (moderasi+export), upload (Storage)
 db/schema.sql            # DDL: invitations, guest_wishes, trigger updated_at, FK, index
 scripts/
-├─ migrate-to-supabase.mjs  # migrasi Neon→Supabase (idempoten)
+├─ migrate-to-supabase.mjs  # migrasi Neon→Supabase (idempoten; ON CONFLICT DO UPDATE = bisa re-seed data_json dari wedding.ts)
 ├─ migrate-media.mjs        # migrasi foto/audio statis → Supabase Storage + data_json
 └─ check-db.mjs             # diagnosa koneksi DB (config object, bukan URL)
 static/
@@ -93,7 +93,7 @@ static/
 | nama_pihak_1 / nama_pihak_2 | TEXT | untuk listing/overview |
 | tanggal_acara | DATE | denormalisasi |
 | template | TEXT | `'classic'` (Fase 6: pilih layout) |
-| data_json | JSONB | kontrak generik §5, CHECK object |
+| data_json | JSONB | kontrak generik §5, CHECK object — **penulisan wajib via helper `jsonb()` di `db.ts`** (lihat §9.10) |
 | status | TEXT | CHECK draft/active/expired |
 | owner_email | TEXT | nullable |
 | access_pin | TEXT | PIN kelola tamu konsumen |
@@ -194,3 +194,4 @@ Pola konsisten: `weddingData` prop + `const w = $derived((weddingData ?? wedding
 7. `vite.config.ts` menyetel `runes: true` global — komponen wajib pola runes.
 8. `static/photos/placeholders/` masih ada sebagai fallback Photo (bukan bug).
 9. Halaman `/[slug]` meng-hide section bila datanya kosong (mis. livestream, IG filter, verse null) — kontrak "section kosong = disembunyikan" sudah terpenuhi sebagian (Verse/Gallery/Events sudah; sisanya lewat fallback wedding.ts).
+10. ~~Pola `${JSON.stringify(x)}::jsonb`~~ ✅ **Sudah diperbaiki** (2026-09-07, commit `d7b43b6`): postgres.js meng-serialize parameter itu dua kali → `jsonb_typeof(data_json)` jadi `string` → melanggar CHECK `invitations_data_json_check` → semua PATCH/POST admin 500 "Internal Error". Sekarang semua penulisan JSONB lewat helper `jsonb()` (`sql.json()`) di `src/lib/server/db.ts`. **Aturan: jangan pernah menulis kolom JSONB dengan stringify manual.**
