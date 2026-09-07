@@ -23,6 +23,7 @@ export function resolveWedding(dataJson: Record<string, unknown> | null | undefi
 	const eventsDj = Array.isArray(dj.events) ? (dj.events as { name?: string; date?: string; time?: string; location?: string; map_url?: string }[]) : [];
 	const giftsDj = Array.isArray(dj.gifts) ? (dj.gifts as { provider?: string; owner?: string; number?: string }[]) : [];
 	const galleryDj = Array.isArray(dj.gallery) ? (dj.gallery as string[]) : null;
+	const photosDj = (dj.photos as Record<string, string> | undefined) ?? null;
 	const themeDj = (dj.theme as Record<string, string> | undefined) ?? {};
 	const musicUrl = (dj.music_url as string | null | undefined) ?? null;
 	const storyIntro = (dj.love_story_intro as string | undefined) ?? null;
@@ -54,6 +55,10 @@ export function resolveWedding(dataJson: Record<string, unknown> | null | undefi
 
 	const photos = {
 		...wedding.photos,
+		hero: (photosDj?.hero?.trim() ? photosDj.hero.trim() : (galleryDj?.[0] ?? wedding.photos.hero)) as string,
+		bride: (photosDj?.bride?.trim() ? photosDj.bride.trim() : wedding.photos.bride) as string,
+		groom: (photosDj?.groom?.trim() ? photosDj.groom.trim() : wedding.photos.groom) as string,
+		cover: (photosDj?.cover?.trim() ? photosDj.cover.trim() : wedding.photos.cover) as string,
 		gallery: galleryDj && galleryDj.length > 0 ? galleryDj : wedding.photos.gallery
 	};
 
@@ -112,6 +117,7 @@ export function resolveWedding(dataJson: Record<string, unknown> | null | undefi
 
 	const accent = themeDj.primary ?? null;
 	const paper2 = themeDj.secondary ?? null;
+	const personalize = (dj.personalize_greeting as boolean | undefined) ?? true;
 
 	return {
 		...wedding,
@@ -121,6 +127,7 @@ export function resolveWedding(dataJson: Record<string, unknown> | null | undefi
 		eventCount,
 		calendarUrlResolved,
 		_livestream: livestream,
-		_theme: { primary: accent, secondary: paper2 }
+		_theme: { primary: accent, secondary: paper2 },
+		_personalize: personalize
 	} as ResolvedWedding;
 }

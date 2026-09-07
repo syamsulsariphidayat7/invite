@@ -323,7 +323,7 @@
 		if (it) it.dataJson = { ...(it.dataJson ?? {}), gallery: rj.gallery ?? arr };
 	}
 
-	async function uploadFiles(e: Event) {
+	async function uploadFiles(e: Event, kind: string = 'gallery') {
 		const input = e.target as HTMLInputElement;
 		if (!input.files?.length || !selected) return;
 		uploadBusy = true;
@@ -331,7 +331,7 @@
 		try {
 			const fd = new FormData();
 			for (const f of Array.from(input.files)) fd.append('files', f);
-			const res = await fetch(`/api/admin/upload?slug=${encodeURIComponent(selected)}`, { method: 'POST', body: fd });
+			const res = await fetch(`/api/admin/upload?slug=${encodeURIComponent(selected)}&kind=${encodeURIComponent(kind)}`, { method: 'POST', body: fd });
 			const j = await res.json().catch(() => null);
 			if (!res.ok) {
 				uploadMsg = j?.message ?? 'Upload gagal.';
@@ -507,11 +507,16 @@
 					</div>
 				{:else if tab === 'foto'}
 					<div class="upload">
-						<p class="hint">Upload ke Supabase Storage bucket <code>invitation-photos/{selected}/</code> (Public, auto-kompresi 1600px JPEG). Butuh env <code>SUPABASE_URL</code> + <code>SUPABASE_SECRET_KEY</code>.</p>
+						<p class="hint">Upload ke Supabase Storage bucket <code>invitation-photos/{selected}/</code> (Public, auto-kompresi 1600px JPEG). <code>kind=gallery|hero|bride|groom</code>.</p>
 						<label class="btn btn-green">
-							<Upload size={14} /> Pilih Foto (max 12)
-							<input type="file" accept="image/*" multiple hidden onchange={uploadFiles} disabled={uploadBusy} />
+							Galeri (max 12)
+							<input type="file" accept="image/*" multiple hidden onchange={(e) => uploadFiles(e, 'gallery')} disabled={uploadBusy} />
 						</label>
+						<div class="row" style="gap:0.4rem;flex-wrap:wrap;display:flex">
+							<label class="btn btn-ghost sm">Hero <input type="file" accept="image/*" hidden onchange={(e) => uploadFiles(e, 'hero')} disabled={uploadBusy} /></label>
+							<label class="btn btn-ghost sm">Bride <input type="file" accept="image/*" hidden onchange={(e) => uploadFiles(e, 'bride')} disabled={uploadBusy} /></label>
+							<label class="btn btn-ghost sm">Groom <input type="file" accept="image/*" hidden onchange={(e) => uploadFiles(e, 'groom')} disabled={uploadBusy} /></label>
+						</div>
 						{#if uploadMsg}<p class="muted">{uploadMsg}</p>{/if}
 						{#if uploadBusy}<p class="muted">Mengupload…</p>{/if}
 						{#if currentGallery().length > 0}

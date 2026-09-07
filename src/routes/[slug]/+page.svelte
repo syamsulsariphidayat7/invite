@@ -14,7 +14,7 @@
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import MusicToggle from '$lib/components/MusicToggle.svelte';
 	import ScrollProgress from '$lib/components/ScrollProgress.svelte';
-	import { startMusic } from '$lib/music.svelte';
+	import { startMusic, setMusicSrc } from '$lib/music.svelte';
 
 	let { data } = $props();
 
@@ -54,7 +54,12 @@
 	}
 
 	onMount(() => {
-		// pratinjau instan: ?preview=1 melewati layar sampul
+		const r = data.resolved as unknown as Record<string, unknown>;
+		const th = r?._theme as { primary?: string | null; secondary?: string | null } | undefined;
+		if (th?.primary) document.documentElement.style.setProperty('--ink', th.primary);
+		if (th?.secondary) document.documentElement.style.setProperty('--paper', th.secondary);
+		const mu = (r?.music as { src?: string } | undefined)?.src;
+		if (mu !== undefined) setMusicSrc(mu ?? '', (r?.music as { startSeconds?: number } | undefined)?.startSeconds);
 		if (page.url.searchParams.has('preview')) {
 			opened = true;
 			overlayVisible = false;
@@ -62,7 +67,6 @@
 			setTimeout(setupReveals, 80);
 			return;
 		}
-		// kunci scroll selama layar sampul terbuka
 		document.body.style.overflow = 'hidden';
 		return () => {
 			document.body.style.overflow = '';
@@ -90,6 +94,11 @@
 	<Couple weddingData={data.resolved} />
 	<Verse weddingData={data.resolved} />
 	<Events weddingData={data.resolved} />
+	{#if (data.resolved as unknown as Record<string, unknown>)?._livestream}
+		<section class="livestream wrap" style="padding:1.2rem 0;text-align:center">
+			<a href={String((data.resolved as unknown as Record<string, string>)._livestream)} target="_blank" rel="noopener" class="btn btn-green">Tonton Live Streaming</a>
+		</section>
+	{/if}
 	<Gallery gallery={data.gallery} />
 	<LoveStory weddingData={data.resolved} />
 	<Gift weddingData={data.resolved} />

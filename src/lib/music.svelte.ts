@@ -6,9 +6,23 @@ export const musicState = writable<{ started: boolean; playing: boolean }>({
 	playing: false
 });
 
+let overrideSrc: string | null = null;
+let overrideStartAt: number | null = null;
+
+export function setMusicSrc(src: string | null, startSeconds?: number) {
+	overrideSrc = src?.trim() ? src.trim() : null;
+	if (typeof startSeconds === 'number') overrideStartAt = startSeconds;
+	if (audio && overrideSrc !== null) {
+		try { audio.src = overrideSrc; audio.load(); } catch {}
+	}
+}
+
 const src = (wedding.music as { src?: string }).src || '';
 const ytId = wedding.music.youtubeId;
 const startAt = wedding.music.startSeconds || 0;
+
+function currentSrc(): string { return overrideSrc ?? src; }
+function currentStartAt(): number { return overrideStartAt ?? startAt; }
 
 let audio: HTMLAudioElement | null = null;
 let bootQueued = false;
@@ -35,9 +49,15 @@ function setPlaying(playing: boolean) {
 
 function ensureAudio(): HTMLAudioElement | null {
 	if (typeof window === 'undefined') return null;
-	if (audio) return audio;
-	if (!src) return null;
-	audio = new Audio(src);
+	const s = currentSrc();
+	if (!s) return null;
+	if (audio) {
+		if (audio.src !== s && !audio.src.endsWith(s)) {
+			try { audio.src = s; audio.load(); } catch {}
+		}
+		return audio;
+	}
+	audio = new Audio(s);
 	audio.loop = true;
 	audio.preload = 'auto';
 	audio.crossOrigin = 'anonymous';
@@ -102,12 +122,14 @@ async function bootYT() {
 
 export async function startMusic() {
 	if (typeof window === 'undefined') return;
-	if (src) {
+	const s = currentSrc();
+	const st = currentStartAt();
+	if (s) {
 		const a = ensureAudio();
 		if (!a) return;
 		try {
-			if (a.currentTime < startAt || a.currentTime === 0) {
-				a.currentTime = startAt;
+			if (a.currentTime < st || a.currentTime === 0) {
+				a.currentTime = st;
 			}
 			await a.play();
 		} catch {}
@@ -120,12 +142,14 @@ export async function startMusic() {
 
 export async function toggleMusic() {
 	if (typeof window === 'undefined') return;
-	if (src) {
+	const s = currentSrc();
+	const st = currentStartAt();
+	if (s) {
 		const a = ensureAudio();
 		if (!a) return;
 		if (a.paused) {
 			try {
-				if (a.currentTime === 0 && startAt) a.currentTime = startAt;
+				if (a.currentTime === 0 && st) a.currentTime = st;
 				await a.play();
 			} catch {}
 		} else {

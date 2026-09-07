@@ -4,9 +4,11 @@ import { getInvitation } from '$lib/server/invitations';
 import { wedding } from '$lib/data/wedding';
 import { resolveWedding } from '$lib/data/resolve';
 
-export const load = async ({ params }) => {
+export const load = async ({ params, url }) => {
 	const inv = await getInvitation(params.slug).catch(() => null);
 	if (!inv && params.slug !== wedding.slug) error(404, 'Undangan tidak ditemukan.');
+	const isPreview = url.searchParams.get('preview') === '1';
+	if (inv && inv.status === 'draft' && !isPreview) error(404, 'Undangan belum tersedia.');
 	if (inv && inv.status === 'expired') error(410, 'Undangan telah berakhir.');
 	const slug = inv?.subdomain ?? params.slug;
 	const [wishes, total] = await Promise.all([listWishes(slug, 30), countWishes(slug)]);

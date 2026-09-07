@@ -45,6 +45,7 @@
 	let selectedIds = $state<Set<string>>(new Set());
 
 	const DEFAULT_TEMPLATE = `Halo {nama}, kamu diundang ke pernikahan Ruhaeni & Asep Roni 💍\n\nBuka undangannya di sini ya:\n{link}\n\nMohon doa & kehadirannya 🙏`;
+	let serverTemplate = $state<string | null>(null);
 	let template = $state(DEFAULT_TEMPLATE);
 
 	const STORAGE_PIN = $derived(`undangan_pin_${slug}`);
@@ -62,9 +63,12 @@
 
 	onMount(() => {
 		origin = window.location.origin;
+		fetch(`/api/guests/template?slug=${encodeURIComponent(slug)}`).then((r) => r.json().catch(() => null)).then((j) => {
+			if (j?.waTemplate?.trim()) { serverTemplate = j.waTemplate; template = j.waTemplate; }
+		}).catch(() => {});
 		try {
 			const tmpl = localStorage.getItem(TEMPLATE_KEY);
-			if (tmpl) template = tmpl;
+			if (tmpl && !serverTemplate) template = tmpl;
 			const qp = page.url.searchParams.get('pin');
 			const stored = sessionStorage.getItem(STORAGE_PIN) ?? localStorage.getItem(STORAGE_PIN);
 			if (qp && qp.length >= 4) {
