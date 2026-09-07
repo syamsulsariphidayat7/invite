@@ -24,6 +24,8 @@ Terakhir diperbarui: 2026-09-07
 | Login Rate Limit | ✅ Selesai — `admin-login` 5/15 menit |
 | dataJson Wiring | ✅ Selesai — `resolve.ts` override penuh ke `/[slug]`: gift.note, venue, social, wishes, instagramFilterUrl, music youtubeId/startSeconds, photos cover |
 | Turnstile captcha | ✅ Aktif & terverifikasi (2026-09-07) — env terisi di Vercel & lokal; POST tanpa token → 400 wajib, token palsu → 400 gagal (siteverify jalan) |
+| Fase 6 multi-layout | ✅ Tahap 1 — registry `src/lib/layouts/` + extract `classic` + layout baru `rose` + dropdown template di admin + preview `?template=` (noir & botanical menyusul) |
+| Migrasi media → Storage | ✅ (2026-09-07) — 15 foto + musik ruhaeni-roni di Supabase Storage `invitation-photos/ruhaeni-roni/`, `data_json.photos/gallery/music_url` berisi URL publik (script `scripts/migrate-media.mjs`) |
 | Anti-XSS | ✅ Selesai — `@html` relation Couple di-escape dulu (`safeRelation`), input admin tidak bisa injeksi HTML |
 | Pre-production Cleanup | ✅ Selesai |
 | Deployment (Vercel + Neon) | ✅ Selesai — auto-deploy dari GitHub, custom domain `invite.boundless.my.id`, `DATABASE_URL` aktif (API ucapan 200 + data terbaca, 2026-09-06) |
@@ -54,9 +56,11 @@ Terakhir diperbarui: 2026-09-07
 - **Batik**: `static/batik/batik-semen.png` 600×600 PNG tunggal, `BatikTexture` cover no-repeat 440px 0.16, dark via invert.
 
 ## Langkah Berikutnya
-1. ✅ Semua fase inti selesai: deploy, domain, foto, musik, slug, kelola tamu, admin, anti-spam, dataJson wiring (commit terbaru `0ea0b38`, terverifikasi live 2026-09-07)
-2. ✅ **Turnstile aktif** — env terisi, produksi memvalidasi captcha (verifikasi 2026-09-07)
-3. ✅ **Bersihkan** — baris tamu uji dihapus (`invitation_guests` = 0); tersisa: nonaktifkan project Neon lama (manual di dashboard)
-4. ⏳ Refactor db.ts + Overlay weddingData — **commit `98d1c4b` lokal, belum di-push**
-5. ⏳ Fase 6 (multi-layout) — future, butuh keputusan desain
-6. ⏳ Fase 7 (custom domain per klien) — future, opsional
+1. ✅ Semua fase inti selesai: deploy, domain, foto, musik, slug, kelola tamu, admin, anti-spam, dataJson wiring
+2. ✅ **Turnstile aktif** — env terisi, produksi memvalidasi captcha
+3. ✅ **Bersihkan** — baris tamu uji dihapus; Neon dinonaktifkan pemilik
+4. ✅ Refactor db.ts + Overlay weddingData + hapus `/tamu` legacy
+5. ✅ **Fase 6 tahap 1**: layout classic & rose + admin dropdown
+6. ⏳ Fase 6 lanjutan: layout `noir` & `botanical`
+7. ⏳ Default `wedding.ts` dinetralkan (konten sampel per-tenant dipindah penuh ke DB) — untuk SaaS murni
+8. ⏳ Fase 7 (custom domain per klien) — future, opsional

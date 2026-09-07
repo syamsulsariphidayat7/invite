@@ -42,6 +42,12 @@ src/
 │  ├─ data/
 │  │  ├─ wedding.ts      # KONTEN DEFAULT + tipe (Person, EventDetail, BankAccount, StoryChapter, Wish)
 │  │  └─ resolve.ts      # resolveWedding(dataJson): override konten DB → objek ResolvedWedding
+│  ├─ layouts/            # Fase 6 multi-layout: registry + meta + classic/ + rose/
+│  │  ├─ registry.ts       # peta nama template → komponen Layout
+│  │  ├─ meta.ts           # metadata template (label/swatch) utk dropdown admin
+│  │  ├─ types.ts          # LayoutProps — kontrak data yang sama utk semua layout
+│  │  ├─ classic/Layout.svelte
+│  │  └─ rose/Layout.svelte
 │  ├─ server/
 │  │  ├─ db.ts           # KONEKSI DB terpusat (postgres.js): dbConfigFromUrl + db() singleton
 │  │  ├─ wishes.ts       # repo ucapan: listWishes/countWishes/addWish (DB/in-memory)
@@ -66,6 +72,7 @@ src/
 db/schema.sql            # DDL: invitations, guest_wishes, trigger updated_at, FK, index
 scripts/
 ├─ migrate-to-supabase.mjs  # migrasi Neon→Supabase (idempoten)
+├─ migrate-media.mjs        # migrasi foto/audio statis → Supabase Storage + data_json
 └─ check-db.mjs             # diagnosa koneksi DB (config object, bukan URL)
 static/
 ├─ audio/wedding.mp3    # musik offline (A Thousand Years)
@@ -101,6 +108,8 @@ static/
 | attendance | CHECK hadir/tidak |
 | created_at | index `(wedding, created_at DESC)` |
 
+**Status media ruhaeni-roni (2026-09-07)**: foto (hero/bride/groom/cover) + 12 galeri + musik sudah di **Supabase Storage** `invitation-photos/ruhaeni-roni/`, direferensikan di `data_json.photos` / `.gallery` / `.music_url` (URL publik). `wedding.ts` tetap fallback default untuk undangan baru yang belum isi media.
+
 **`invitation_guests`** — daftar tamu kelola (per undangan)
 id UUID, invitation_id FK CASCADE, wedding, name, normalized_name (dedup), sent, sent_at, created_at. Auto-create + `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` di `guests.ts:init()`.
 
@@ -127,7 +136,9 @@ personalize_greeting: boolean
 ```
 `resolveWedding` mengembalikan objek = `wedding` default + override, plus `resolved:true`, `eventCount`, `calendarUrlResolved`, `_theme`, `_livestream`, `_personalize`.
 
-## 6. Komponen UI (semua di `src/lib/components/`)
+## 6. Layout & Komponen UI
+
+**Multi-layout (Fase 6):** `[slug]/+page.svelte` memilih komponen via `layouts[template]` (`src/lib/layouts/registry.ts`), kolom `invitations.template`; override sesi `?template=` untuk pratinjau. Semua layout menerima `LayoutProps` yang sama (resolved + wishes + guest + slug) — nambah layout = tambah folder + daftar di registry. Admin memilih template via dropdown di form buat/edit. Varian warna per-undangan tetap dari `theme` di `data_json`.
 
 | Komponen | Konten | Props |
 |---|---|---|
@@ -168,16 +179,18 @@ Pola konsisten: `weddingData` prop + `const w = $derived((weddingData ?? wedding
 | `DATABASE_URL` | pooler Supabase 6543 (parser custom tahan password `?`) | ✅ lokal & Vercel |
 | `ADMIN_PIN` | login admin | ✅ |
 | `SUPABASE_URL` / `SUPABASE_SECRET_KEY` | Storage upload | ✅ |
-| `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | captcha form ucapan | ⏳ belum |
+| `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | captcha form ucapan | ✅ aktif (hostname `invite.boundless.my.id`) |
 
 `.env` di-gitignore; `.env.example` jadi referensi.
 
 ## 9. Temuan / Catatan (dari pemindaian)
 
-1. ~~Duplikasi koneksi DB~~ ✅ **Sudah di-refactor** (2026-09-07): `src/lib/server/db.ts` terpusat, 4 file konsumen dipindah (wishes, invitations, guests, api/admin/wishes).
-2. ~~Overlay pakai `wedding` statis~~ ✅ **Sudah di-update** (2026-09-07): menerima `weddingData`, cover/nama/tanggal sampul ikut per-undangan.
-3. ~~Dua sistem kelola tamu~~ ✅ **Rute legacy `/tamu` dihapus** (2026-09-07); hanya `/[slug]/kelola` (DB, multi-tenant) yang dipakai.
-4. **Rate limit in-memory** — reset saat instance restart (cukup untuk 1 instance Vercel; catatan untuk skala).
-5. `vite.config.ts` menyetel `runes: true` global — komponen wajib pola runes.
-6. `static/photos/placeholders/` masih ada sebagai fallback Photo (bukan bug).
-7. Halaman `/[slug]` meng-hide section bila datanya kosong (mis. livestream, IG filter, verse null) — kontrak "section kosong = disembunyikan" sudah terpenuhi sebagian (Verse/Gallery/Events sudah; sisanya lewat fallback wedding.ts).
+1. **Fase 6 berjalan bertahap**: `classic` & `rose` tuntas (registry + admin dropdown + `?template=` preview); `noir` & `botanical` menyusul (daftar di `layouts/registry.ts` + `meta.ts`).
+2. **Media ruhaeni-roni sudah di Storage** (foto + galeri + musik, URL publik di `data_json`); `wedding.ts` berisi default sampel untuk undangan baru — untuk SaaS murni, default sampel perlu dikosongkan/diganti placeholder agar konten tenant tidak bocor.
+3. ~~Duplikasi koneksi DB~~ ✅ **Sudah di-refactor** (2026-09-07): `src/lib/server/db.ts` terpusat, 4 file konsumen dipindah (wishes, invitations, guests, api/admin/wishes).
+4. ~~Overlay pakai `wedding` statis~~ ✅ **Sudah di-update** (2026-09-07): menerima `weddingData`, cover/nama/tanggal sampul ikut per-undangan.
+5. ~~Dua sistem kelola tamu~~ ✅ **Rute legacy `/tamu` dihapus** (2026-09-07); hanya `/[slug]/kelola` (DB, multi-tenant) yang dipakai.
+6. **Rate limit in-memory** — reset saat instance restart (cukup untuk 1 instance Vercel; catatan untuk skala).
+7. `vite.config.ts` menyetel `runes: true` global — komponen wajib pola runes.
+8. `static/photos/placeholders/` masih ada sebagai fallback Photo (bukan bug).
+9. Halaman `/[slug]` meng-hide section bila datanya kosong (mis. livestream, IG filter, verse null) — kontrak "section kosong = disembunyikan" sudah terpenuhi sebagian (Verse/Gallery/Events sudah; sisanya lewat fallback wedding.ts).

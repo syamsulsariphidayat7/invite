@@ -1,25 +1,33 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
+	import type { Component } from 'svelte';
 	import Overlay from '$lib/components/Overlay.svelte';
-	import Hero from '$lib/components/Hero.svelte';
-	import Couple from '$lib/components/Couple.svelte';
-	import Verse from '$lib/components/Verse.svelte';
-	import Events from '$lib/components/Events.svelte';
-	import Gallery from '$lib/components/Gallery.svelte';
-	import LoveStory from '$lib/components/LoveStory.svelte';
-	import Gift from '$lib/components/Gift.svelte';
-	import Wishes from '$lib/components/Wishes.svelte';
-	import Footer from '$lib/components/Footer.svelte';
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import MusicToggle from '$lib/components/MusicToggle.svelte';
 	import ScrollProgress from '$lib/components/ScrollProgress.svelte';
+	import { layouts } from '$lib/layouts/registry';
+	import { isKnownTemplate } from '$lib/layouts/meta';
+	import type { LayoutProps } from '$lib/layouts/types';
 	import { startMusic, setMusicSrc } from '$lib/music.svelte';
 
 	let { data } = $props();
 
 	let opened = $state(false);
 	let overlayVisible = $state(true);
+
+	// layout dipilih dari kolom `template` undangan; bisa di-override sesi via ?template=
+	const template = $derived(
+		isKnownTemplate(page.url.searchParams.get('template')) ? (page.url.searchParams.get('template') as string) : (data.template ?? 'classic')
+	);
+	const Layout = $derived((layouts[template] ?? layouts.classic) as Component<LayoutProps>);
+	const layoutProps = $derived<Omit<LayoutProps, 'guest'>>({
+		resolved: data.resolved,
+		gallery: data.gallery,
+		wishes: data.wishes,
+		total: data.total,
+		slug: data.slug
+	});
 
 	// nama tamu lewat ?to=Nama (atau ?nama=)
 	const guest = $derived(
@@ -89,22 +97,7 @@
 	}
 </script>
 
-<main class="invite">
-	<Hero weddingData={data.resolved} />
-	<Couple weddingData={data.resolved} />
-	<Verse weddingData={data.resolved} />
-	<Events weddingData={data.resolved} />
-	{#if (data.resolved as unknown as Record<string, unknown>)?._livestream}
-		<section class="livestream wrap" style="padding:1.2rem 0;text-align:center">
-			<a href={String((data.resolved as unknown as Record<string, string>)._livestream)} target="_blank" rel="noopener" class="btn btn-green">Tonton Live Streaming</a>
-		</section>
-	{/if}
-	<Gallery gallery={data.gallery} weddingData={data.resolved} />
-	<LoveStory weddingData={data.resolved} />
-	<Gift weddingData={data.resolved} />
-	<Wishes initialWishes={data.wishes} initialTotal={data.total} guestName={guest} slug={data.slug} weddingData={data.resolved} />
-	<Footer weddingData={data.resolved} />
-</main>
+<Layout {...layoutProps} {guest} />
 
 {#if overlayVisible}
 	<Overlay {guest} closed={opened} onopen={openInvite} weddingData={data.resolved} />
@@ -112,4 +105,4 @@
 
 <ScrollProgress />
 <BottomNav />
-	<MusicToggle weddingData={data.resolved} />
+<MusicToggle weddingData={data.resolved} />

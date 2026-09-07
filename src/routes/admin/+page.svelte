@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { templateMeta, DEFAULT_TEMPLATE } from '$lib/layouts/meta';
 	import { LogOut, Plus, Trash2, Edit3, Copy, Check, ExternalLink, Upload, Users, MessageCircle } from 'lucide-svelte';
 
 	interface InvitationItem {
@@ -74,6 +75,7 @@
 	let formPihak2 = $state('');
 	let formTanggal = $state('');
 	let formStatus = $state('draft');
+	let formTemplate = $state(DEFAULT_TEMPLATE);
 	let formPin = $state('');
 	let formSaving = $state(false);
 	let formErr = $state('');
@@ -110,6 +112,7 @@
 		formPihak2 = '';
 		formTanggal = '';
 		formStatus = 'draft';
+		formTemplate = DEFAULT_TEMPLATE;
 		formPin = Math.floor(100000 + Math.random() * 900000).toString();
 		formErr = '';
 		showForm = true;
@@ -122,6 +125,7 @@
 		formPihak2 = it.namaPihak2;
 		formTanggal = it.tanggalAcara ?? '';
 		formStatus = it.status;
+		formTemplate = it.template || DEFAULT_TEMPLATE;
 		formPin = it.accessPin ?? '';
 		formErr = '';
 		showForm = true;
@@ -138,12 +142,11 @@
 					headers: { 'content-type': 'application/json' },
 					body: JSON.stringify({
 						namaPihak1: formPihak1,
-						namaPihak2: formPihak2,
-						tanggalAcara: formTanggal || null,
-						template: 'classic',
-						status: formStatus,
-						accessPin: formPin || null
-					})
+						namaPihak2: formPihak2,					tanggalAcara: formTanggal || null,
+					template: formTemplate,
+					status: formStatus,
+					accessPin: formPin || null
+				})
 				});
 				const j = await res.json().catch(() => null);
 				if (!res.ok) {
@@ -164,12 +167,11 @@
 					body: JSON.stringify({
 						subdomain: sd,
 						namaPihak1: formPihak1,
-						namaPihak2: formPihak2,
-						tanggalAcara: formTanggal || null,
-						template: 'classic',
-						status: formStatus,
-						accessPin: formPin || null
-					})
+						namaPihak2: formPihak2,					tanggalAcara: formTanggal || null,
+					template: formTemplate,
+					status: formStatus,
+					accessPin: formPin || null
+				})
 				});
 				const j = await res.json().catch(() => null);
 				if (!res.ok) {
@@ -682,6 +684,14 @@
 							<option value="draft">draft</option>
 							<option value="active">active</option>
 							<option value="expired">expired</option>
+						</select>
+					</label>
+					<label>
+						<span>Template / Layout</span>
+						<select bind:value={formTemplate}>
+							{#each templateMeta as t}
+								<option value={t.id}>{t.label} — {t.description}</option>
+							{/each}
 						</select>
 					</label>
 					<label><span>PIN Kelola Tamu (6-digit, kosong = tanpa PIN / dev 000000)</span><input type="text" bind:value={formPin} placeholder="482913" /></label>
