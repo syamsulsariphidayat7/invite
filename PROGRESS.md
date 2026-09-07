@@ -3,7 +3,7 @@
 Terakhir diperbarui: 2026-09-07
 
 ## Fase Aktif
-**Admin Full Editor + Sharp + dataJson wiring** — lengkap events/gifts/couple/verse/story/theme/music, kompresi sharp, gallery manage, rate limit login.
+**Tidak ada fase besar sedang berjalan** — semua fitur inti selesai (per 2026-09-07). Item terbuka hanya operasional: isi env Turnstile (kode sudah siap), bersihkan data uji, matikan Neon lama. Fase 6 (multi-layout) & 7 (custom domain) masih future.
 
 ## Status Fase
 | Fase | Status |
@@ -19,15 +19,17 @@ Terakhir diperbarui: 2026-09-07
 | Anti-spam (rate limit + honeypot) | ✅ Selesai — `rateLimit.ts`, `/api/wishes` 6/menit + `/api/guests` 20/menit, honeypot `website` |
 | Galeri Storage → `data_json.gallery` | ✅ Selesai — upload auto-append gallery (Photo direct URL), sinkron ke `/[slug]` |
 | WA Mass-share | ✅ Selesai — bulk select di `/{slug}/kelola`, salin link massal + buka WA berurutan + tandai terkirim |
-| Admin Full Editor | ✅ Selesai — `data_json` lengkap (events/gifts/couple/verse/story/theme/music), tab Konten di `/admin` |
+| Admin Full Editor | ✅ Selesai — tab Konten di `/admin`: events, gifts, couple, ayat, story, theme, music + **gift note, venue, social, IG filter, wishes, music YT/startSeconds, cover** |
 | Sharp Kompresi | ✅ Selesai — upload auto-resize 1600px JPEG 82 mozjpeg, gallery hapus/reorder |
 | Login Rate Limit | ✅ Selesai — `admin-login` 5/15 menit |
-| dataJson Wiring | ✅ Selesai — `resolve.ts` override ke `/[slug]` (Hero/Couple/Verse/Events/Gift/Story/Footer/Music) |
+| dataJson Wiring | ✅ Selesai — `resolve.ts` override penuh ke `/[slug]`: gift.note, venue, social, wishes, instagramFilterUrl, music youtubeId/startSeconds, photos cover |
+| Turnstile meta | ✅ Kode siap — `+layout.server.ts` ekspos `TURNSTILE_SITE_KEY` → `<meta name=turnstile-sitekey>`; Wishes API wajib token bila `TURNSTILE_SECRET_KEY` terisi. ⏳ env belum diisi |
+| Anti-XSS | ✅ Selesai — `@html` relation Couple di-escape dulu (`safeRelation`), input admin tidak bisa injeksi HTML |
 | Pre-production Cleanup | ✅ Selesai |
 | Deployment (Vercel + Neon) | ✅ Selesai — auto-deploy dari GitHub, custom domain `invite.boundless.my.id`, `DATABASE_URL` aktif (API ucapan 200 + data terbaca, 2026-09-06) |
 
 ## Sedang Dikerjakan
-- (kosong)
+- (kosong — lihat Langkah Berikutnya)
 
 ## Sudah Selesai
 - Undangan lengkap: layar sampul + musik, hero, mempelai, ayat, countdown, akad & resepsi (20–21 Sep 2026), galeri, love story 3 bab, amplop digital, ucapan tamu → Neon, nav bawah, footer.
@@ -52,14 +54,8 @@ Terakhir diperbarui: 2026-09-07
 - **Batik**: `static/batik/batik-semen.png` 600×600 PNG tunggal, `BatikTexture` cover no-repeat 440px 0.16, dark via invert.
 
 ## Langkah Berikutnya
-1. ✅ Push commit awal ke GitHub — commit `d6a2938` di `main` (repo: syamsulsariphidayat7/invite)
-2. ✅ Import repo di Vercel, set `DATABASE_URL`, deploy — live di Supabase (terverifikasi 2026-09-06)
-3. ✅ Custom domain di Vercel: `invite.boundless.my.id` — aktif (wildcard `*.boundless.my.id` SKIP — opsional Fase 7)
-4. ✅ Ganti foto placeholder dengan foto asli — 15 foto terpasang (hero, bride, groom, galeri 12)
-5. ✅ Musik latar — A Thousand Years (offline mp3)
-6. ✅ Polish & cleanup — done 2026-09-06
-7. ✅ Data produksi rekening DANA & IG
-8. ✅ Slug routing `/[slug]` (`/ruhaeni-roni`) — path-based aktif; subdomain via Fase 7 opsional
-9. ✅ Kelola tamu konsumen `/[slug]/kelola` (PIN, DB-synced, bulk WA)
-10. ✅ Panel admin `/admin` (Full Editor + sharp + gallery manage + login limit)
-11. ✅ Anti-spam + honeypot + rate limit + dataJson wiring
+1. ✅ Semua fase inti selesai: deploy, domain, foto, musik, slug, kelola tamu, admin, anti-spam, dataJson wiring (commit terbaru `0ea0b38`, terverifikasi live 2026-09-07)
+2. ⏳ **Aktifkan Turnstile**: isi `TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` di Vercel & `.env` (kode sudah siap, meta sudah ter-render di produksi)
+3. ⏳ **Bersihkan**: 1 baris tamu uji di `invitation_guests`; nonaktifkan project Neon lama
+4. ⏳ Fase 6 (multi-layout) — future, butuh keputusan desain
+5. ⏳ Fase 7 (custom domain per klien) — future, opsional
