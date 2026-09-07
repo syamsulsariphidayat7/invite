@@ -32,5 +32,5 @@
 ## Arah Pengembangan (SaaS multi-tenant — rencana Boundless)
 - Skema `invitations` + `guest_wishes` DIAPPROVE (2026-09-06): lihat `db/schema.sql` & `rencana-agent-boundless-invitation.md`.
 - Script migrasi: `scripts/migrate-to-supabase.mjs` (Neon → Supabase, idempoten).
-- Subdomain dinamis (`ruhaeni-roni.boundless.my.id`) via wildcard Cloudflare+Vercel (Fase 0 manual).
+- Subdomain dinamis (`ruhaeni-roni.boundless.my.id`) via wildcard Cloudflare+Vercel — **SKIP (opsional, Fase 7)**; routing utama tetap path-based `invite.boundless.my.id/{slug}`.
 - Panel admin `/admin` terproteksi untuk CRUD undangan & moderasi ucapan (Fase 5).

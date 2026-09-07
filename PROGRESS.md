@@ -1,9 +1,9 @@
 # PROGRESS.md — Undangan (Invite)
 
-Terakhir diperbarui: 2026-09-06
+Terakhir diperbarui: 2026-09-07
 
 ## Fase Aktif
-**SaaS Multi-Tenant (Rencana Boundless)** — Fase 0–2 selesai: produksi live di Supabase (`invite.boundless.my.id`), skema `invitations` terpasang. Lanjut Fase 3 (routing subdomain) — lihat `rencana-agent-boundless-invitation.md`.
+**Panel Admin `/admin` + Supabase Storage** — Auth `ADMIN_PIN` + CRUD `invitations` + upload galeri + moderasi tamu/ucapan selesai.
 
 ## Status Fase
 | Fase | Status |
@@ -14,11 +14,12 @@ Terakhir diperbarui: 2026-09-06
 | Integration & Testing | ✅ Selesai (svelte-check 0 error, build OK, API Neon 201/400 OK, screenshot OK) |
 | Polish UI (Hero, Batik, Font, Nav, Progress) | ✅ Selesai |
 | Dynamic Slug Routing `/[slug]` | ✅ Selesai (`/ruhaeni-roni`) |
+| Kelola Tamu Konsumen (PIN, `/[slug]/kelola`) | ✅ Selesai — DB `invitation_guests`, API `/api/guests`, konsumen self-service |
+| Panel Admin `/admin` | ✅ Selesai — `ADMIN_PIN` + `hooks.server.ts` + `invitations` CRUD + upload Storage + moderasi |
 | Pre-production Cleanup | ✅ Selesai |
 | Deployment (Vercel + Neon) | ✅ Selesai — auto-deploy dari GitHub, custom domain `invite.boundless.my.id`, `DATABASE_URL` aktif (API ucapan 200 + data terbaca, 2026-09-06) |
 
 ## Sedang Dikerjakan
-- Fase 3 rencana SaaS: routing subdomain dinamis via `hooks.server.ts` (usul skema sudah terealisasi di DB produksi Supabase).
 - Bersihkan baris tes di `guest_wishes` produksi ("Tes Lokal", "Verifikasi Produksi", "hwd").
 
 ## Sudah Selesai
@@ -29,6 +30,8 @@ Terakhir diperbarui: 2026-09-06
 - Ucapan & Kehadiran: form di atas list, stepper jumlah kehadiran (1-10 orang), pagination 3 ucapan/halaman.
 - Nav & Scroll: sticky top countdown saat scroll, bottom nav active indicator sesuai posisi scroll, scroll progress bar top.
 - Data produksi 2026-09-06: DANA Ruhaeni 085724087380 & Asep Roni 085624398337, IG _ruhaeni & ronii_wiguna, footer link Boundless `http://boundless.my.id/`.
+- Kelola Tamu Konsumen: `/{slug}/kelola` PIN 6-digit per undangan, `api/guests` CRUD + `invitation_guests` (sent/sent_at, dedup normalized_name), `/tamu` legacy tetap; `invitations.access_pin + wa_template`.
+- Panel Admin `/admin`: login `ADMIN_PIN` env (`hooks.server.ts` + `admin_pin` httpOnly cookie), CRUD `invitations` (`api/admin/invitations`), detail tamu/ucapan per subdomain, export CSV, upload galeri `invitation-photos/{slug}/` ke Supabase Storage (`@supabase/supabase-js` + `SUPABASE_URL/SERVICE_ROLE_KEY`).
 - SEO & Open Graph Preview: meta `og:image`, `og:url`, `og:title`, `og:description`, `twitter:card` summary_large_image, canonical link ke `https://invite.boundless.my.id/ruhaeni-roni`.
 - Kompresi Foto: 15 foto dioptimasi (max 1600px, quality 82%, interlaced), ukuran total turun dari ~28 MB ke ~4.3 MB (hemat 85% bandwidth).
 
@@ -42,9 +45,11 @@ Terakhir diperbarui: 2026-09-06
 ## Langkah Berikutnya
 1. ✅ Push commit awal ke GitHub — commit `d6a2938` di `main` (repo: syamsulsariphidayat7/invite)
 2. ✅ Import repo di Vercel, set `DATABASE_URL`, deploy — live di Supabase (terverifikasi 2026-09-06)
-3. ✅ Custom domain di Vercel: `invite.boundless.my.id` — aktif
+3. ✅ Custom domain di Vercel: `invite.boundless.my.id` — aktif (wildcard `*.boundless.my.id` SKIP — opsional Fase 7)
 4. ✅ Ganti foto placeholder dengan foto asli — 15 foto terpasang (hero, bride, groom, galeri 12)
 5. ✅ Musik latar — A Thousand Years (offline mp3)
 6. ✅ Polish & cleanup — done 2026-09-06
 7. ✅ Data produksi rekening DANA & IG
-8. ✅ Slug routing `/[slug]` (`/ruhaeni-roni`)
+8. ✅ Slug routing `/[slug]` (`/ruhaeni-roni`) — path-based aktif; subdomain via Fase 7 opsional
+9. ✅ Kelola tamu konsumen `/[slug]/kelola` (PIN, DB-synced)
+10. ✅ Panel admin `/admin` (ADMIN_PIN + CRUD + Storage)

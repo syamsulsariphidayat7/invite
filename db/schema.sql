@@ -35,6 +35,9 @@ CREATE TABLE IF NOT EXISTS invitations (
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+ALTER TABLE invitations ADD COLUMN IF NOT EXISTS access_pin TEXT;
+ALTER TABLE invitations ADD COLUMN IF NOT EXISTS wa_template TEXT DEFAULT '';
+
 CREATE INDEX IF NOT EXISTS idx_invitations_status   ON invitations (status);
 CREATE INDEX IF NOT EXISTS idx_invitations_created  ON invitations (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_invitations_data_gin ON invitations USING GIN (data_json);
@@ -50,6 +53,23 @@ DROP TRIGGER IF EXISTS trg_invitations_updated_at ON invitations;
 CREATE TRIGGER trg_invitations_updated_at
   BEFORE UPDATE ON invitations
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ------------------------------------------------- invitation_guests
+CREATE TABLE IF NOT EXISTS invitation_guests (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  invitation_id   UUID NOT NULL REFERENCES invitations(id) ON DELETE CASCADE,
+  wedding         TEXT NOT NULL,
+  name            TEXT NOT NULL,
+  normalized_name TEXT NOT NULL,
+  sent            BOOLEAN NOT NULL DEFAULT false,
+  sent_at         TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (invitation_id, normalized_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_invitation_guests_wedding       ON invitation_guests (wedding);
+CREATE INDEX IF NOT EXISTS idx_invitation_guests_invitation_id ON invitation_guests (invitation_id);
+CREATE INDEX IF NOT EXISTS idx_invitation_guests_sent          ON invitation_guests (sent);
 
 -- ------------------------------------------------- relasi & index pencarian
 CREATE INDEX IF NOT EXISTS idx_guest_wishes_wedding_created

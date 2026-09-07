@@ -16,13 +16,15 @@
 
 ## FASE 0 — Setup Infrastruktur (MANUAL, di luar akses agent)
 
-1. **Cloudflare DNS**
+1. **Cloudflare DNS — [SKIP — Opsional, wildcard subdomain ditunda]**
    - Pastikan domain `boundless.my.id` nameserver-nya memang dikelola Cloudflare
-   - Tambah record: `Type: CNAME`, `Name: *`, `Target: cname.vercel-dns.com`, `Proxy status: DNS only` (awan abu-abu, BUKAN oranye)
+   - [SKIP] Tambah record: `Type: CNAME`, `Name: *`, `Target: cname.vercel-dns.com`, `Proxy status: DNS only` (awan abu-abu, BUKAN oranye)
+   - Status: **SKIP** — routing utama tetap path-based `invite.boundless.my.id/{slug}`; wildcard hanya untuk Fase 7 custom subdomain jika dibutuhkan nanti.
 
-2. **Vercel Domain Settings**
-   - Project Settings → Domains → tambahkan `*.boundless.my.id`
-   - Verifikasi SSL wildcard aktif (biasanya otomatis beberapa menit)
+2. **Vercel Domain Settings — [SKIP — Opsional]**
+   - [SKIP] Project Settings → Domains → tambahkan `*.boundless.my.id`
+   - [SKIP] Verifikasi SSL wildcard aktif (biasanya otomatis beberapa menit)
+   - Status: **SKIP** — domain aktif tetap `invite.boundless.my.id` (tanpa wildcard).
 
 3. **Buat akun & project Supabase (atau DB pilihan lain)**
    - Catat `SUPABASE_URL` dan `SUPABASE_ANON_KEY` / `SERVICE_ROLE_KEY`
@@ -100,8 +102,9 @@ Poin penting untuk agent:
 
 ---
 
-## FASE 3 — Routing Subdomain Dinamis (AGENT)
-- Buat/edit `src/hooks.server.js`:
+## FASE 3 — Routing Dinamis (AGENT) — Path-based aktif; subdomain via Fase 7 opsional
+- **Aktif sekarang (path-based):** `src/routes/[slug]/+page.server.ts` & `src/routes/[slug]/kelola` validasi `params.slug` vs `invitations.subdomain` / `wedding.ts` fallback; root `/` redirect ke `/${wedding.slug}`.
+- **Opsional (subdomain wildcard, SKIP):** Buat `src/hooks.server.ts` hanya jika Fase 0 wildcard diaktifkan:
   - Ambil `event.url.hostname`, parse subdomain (bagian sebelum domain utama)
   - Validasi bukan bagian dari daftar reserved (Fase 0 poin 4)
   - Query tabel `invitations` berdasarkan `subdomain`
@@ -112,8 +115,8 @@ Poin penting untuk agent:
 ---
 
 ## FASE 4 — Testing End-to-End (AGENT)
-- Deploy ke Vercel, akses `ruhaeni-roni.boundless.my.id`, pastikan render sama dengan versi lama
-- Test subdomain acak (`test123.boundless.my.id`) untuk pastikan 404 handling benar
+- Deploy ke Vercel, akses `invite.boundless.my.id/ruhaeni-roni` (path-based aktif) dan — jika wildcard aktif — `ruhaeni-roni.boundless.my.id`, pastikan render sama dengan versi lama
+- Test slug/subdomain acak (`test123` / `test123.boundless.my.id`) untuk pastikan 404 handling benar
 - Test invitation dengan variasi data (1 event vs banyak event, 1 gift vs banyak gift) untuk pastikan layout tidak crash saat array kosong/panjang
 - **Sebelum disebar luas ke publik**: tambahkan rate limiting/captcha sederhana di form wishes/RSVP (public-facing) untuk cegah spam bot, karena saat ini masih tahap preview jadi belum kena risiko ini
 
