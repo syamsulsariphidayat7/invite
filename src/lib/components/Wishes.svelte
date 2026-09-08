@@ -40,17 +40,7 @@
 		if (page > totalPages) page = totalPages;
 		if (page < 1) page = 1;
 	});
-	$effect(() => {
-		if (!turnstileSiteKey) return;
-		const id = 'cf-turnstile-script';
-		if (document.getElementById(id)) return;
-		const s = document.createElement('script');
-		s.id = id;
-		s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
-		s.async = true;
-		document.head.appendChild(s);
-		(window as unknown as Record<string, unknown>).onTurnstile = (token: string) => { turnstileToken = token; };
-	});
+	// Turnstile disabled
 	let busy = $state(false);
 	let status = $state<{ kind: 'idle' | 'error' | 'ok'; text: string }>({ kind: 'idle', text: '' });
 
@@ -187,10 +177,7 @@
 				></textarea>
 			</label>
 			<input type="text" bind:value={website} tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;pointer-events:none;" />
-			{#if turnstileSiteKey}
-				<div class="cf-turnstile" data-sitekey={turnstileSiteKey} data-callback="onTurnstile" style="margin:0.6rem 0"></div>
-				<input type="hidden" bind:value={turnstileToken} />
-			{/if}
+			<!-- Turnstile disabled -->
 
 			{#if status.kind === 'error'}
 				<p class="msg error"><AlertCircle size={14} /> {status.text}</p>

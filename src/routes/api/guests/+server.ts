@@ -12,7 +12,7 @@ function getPin(request: Request, url: URL): string {
 
 export async function GET({ request, url }) {
 	const slug = getSlug(url);
-	if (!slug) error(400, 'slug required');
+	if (!slug) error(400, 'Undangan wajib.');
 	const pin = getPin(request, url);
 	const auth = await verifyPin(slug, pin);
 	if (!auth.ok) error(401, 'PIN salah atau tidak diberikan.');
@@ -22,7 +22,7 @@ export async function GET({ request, url }) {
 
 export async function POST({ request, url, getClientAddress }) {
 	const slug = getSlug(url);
-	if (!slug) error(400, 'slug required');
+	if (!slug) error(400, 'Undangan wajib.');
 	const ip = clientKey(request, (() => { try { return getClientAddress(); } catch { return 'unknown'; } })());
 	const rl = checkRateLimit(`guests:${ip}:${slug}`, 20, 60_000);
 	if (!rl.allowed) error(429, `Terlalu sering. Coba lagi ${rl.retryAfter} detik.`);
@@ -33,11 +33,11 @@ export async function POST({ request, url, getClientAddress }) {
 	try {
 		body = await request.json();
 	} catch {
-		error(400, 'Body harus JSON.');
+		error(400, 'Data tidak valid.');
 	}
 	const { names, website } = (body ?? {}) as { names?: unknown; website?: unknown };
 	if (typeof website === 'string' && website.trim()) return json({ added: [], count: 0 }, { status: 201 });
-	if (!Array.isArray(names) || names.length === 0) error(400, 'names harus array berisi minimal 1 nama.');
+	if (!Array.isArray(names) || names.length === 0) error(400, 'Daftar nama wajib diisi.');
 	const strNames = names.filter((n): n is string => typeof n === 'string').map((n) => n.trim()).filter(Boolean);
 	if (strNames.length === 0) error(400, 'names harus berisi string tidak kosong.');
 	if (strNames.length > 200) error(400, 'Maksimum 200 nama per request.');
@@ -50,7 +50,7 @@ export async function POST({ request, url, getClientAddress }) {
 
 export async function PATCH({ request, url }) {
 	const slug = getSlug(url);
-	if (!slug) error(400, 'slug required');
+	if (!slug) error(400, 'Undangan wajib.');
 	const pin = getPin(request, url);
 	const auth = await verifyPin(slug, pin);
 	if (!auth.ok) error(401, 'PIN salah atau tidak diberikan.');
@@ -58,11 +58,11 @@ export async function PATCH({ request, url }) {
 	try {
 		body = await request.json();
 	} catch {
-		error(400, 'Body harus JSON.');
+		error(400, 'Data tidak valid.');
 	}
 	const { id, sent } = (body ?? {}) as { id?: unknown; sent?: unknown };
-	if (typeof id !== 'string' || !id) error(400, 'id required');
-	if (typeof sent !== 'boolean') error(400, 'sent harus boolean');
+	if (typeof id !== 'string' || !id) error(400, 'ID tidak valid.');
+	if (typeof sent !== 'boolean') error(400, 'Status tidak valid.');
 	const guest = await updateGuestSent(slug, id, sent);
 	if (!guest) error(404, 'Tamu tidak ditemukan.');
 	return json({ guest });
@@ -70,7 +70,7 @@ export async function PATCH({ request, url }) {
 
 export async function DELETE({ request, url }) {
 	const slug = getSlug(url);
-	if (!slug) error(400, 'slug required');
+	if (!slug) error(400, 'Undangan wajib.');
 	const pin = getPin(request, url);
 	const auth = await verifyPin(slug, pin);
 	if (!auth.ok) error(401, 'PIN salah atau tidak diberikan.');
@@ -95,5 +95,5 @@ export async function DELETE({ request, url }) {
 		const count = await deleteAllGuests(slug);
 		return json({ success: true, deleted: count });
 	}
-	error(400, 'Berikan id atau all=1 untuk hapus semua.');
+	error(400, 'Pilih data yang akan dihapus.');
 }

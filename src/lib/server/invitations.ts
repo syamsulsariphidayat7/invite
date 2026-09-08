@@ -124,9 +124,9 @@ export async function deleteInvitation(subdomain: string): Promise<boolean> {
 }
 
 export function validateSubdomain(s: string): string | null {
-	if (!s || s.length < 3 || s.length > 63) return 'Subdomain 3-63 karakter.';
-	if (!/^[a-z0-9]([a-z0-9-]{1,61}[a-z0-9])?$/.test(s)) return 'Format subdomain tidak valid (huruf kecil, angka, strip).';
+	if (!s || s.length < 3 || s.length > 63) return 'Link undangan 3-63 karakter.';
+	if (!/^[a-z0-9]([a-z0-9-]{1,61}[a-z0-9])?$/.test(s)) return 'Format link tidak valid (huruf kecil, angka, strip).';
 	const reserved = new Set(['www', 'admin', 'api', 'app', 'invite', 'mail', 'ftp', 'blog', 'shop', 'staging', 'test', 'dev', 'tamu', 'kelola']);
-	if (reserved.has(s)) return `Subdomain "${s}" tidak boleh dipakai.`;
+	if (reserved.has(s)) return `Link "${s}" tidak boleh dipakai.`;
 	return null;
 }

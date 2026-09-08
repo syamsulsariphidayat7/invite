@@ -13,16 +13,16 @@ export async function POST({ request, locals }) {
 	try {
 		body = await request.json();
 	} catch {
-		error(400, 'Body harus JSON.');
+		error(400, 'Data tidak valid.');
 	}
 	const { subdomain, namaPihak1, namaPihak2, tanggalAcara, template, dataJson, status, accessPin, waTemplate } = (body ?? {}) as Record<string, unknown>;
-	if (typeof subdomain !== 'string' || !subdomain.trim()) error(400, 'subdomain wajib.');
+	if (typeof subdomain !== 'string' || !subdomain.trim()) error(400, 'Link undangan wajib.');
 	const sd = subdomain.trim().toLowerCase();
 	const v = validateSubdomain(sd);
 	if (v) error(400, v);
 	if (status != null && typeof status !== 'string') error(400, 'status tidak valid.');
 	if (status && !['draft', 'active', 'expired'].includes(status as string)) error(400, 'status harus draft/active/expired.');
-	if (dataJson != null && (typeof dataJson !== 'object' || Array.isArray(dataJson))) error(400, 'dataJson harus object.');
+	if (dataJson != null && (typeof dataJson !== 'object' || Array.isArray(dataJson))) error(400, 'Data tidak valid.');
 	try {
 		const row = await createInvitation({
 			subdomain: sd,
@@ -38,7 +38,7 @@ export async function POST({ request, locals }) {
 		return json({ item: row }, { status: 201 });
 	} catch (e: unknown) {
 		const msg = e instanceof Error ? e.message : String(e);
-		if (msg.includes('duplicate') || msg.includes('unique')) error(409, 'Subdomain sudah dipakai.');
+		if (msg.includes('duplicate') || msg.includes('unique')) error(409, 'Link undangan sudah dipakai.');
 		throw e;
 	}
 }
@@ -46,16 +46,16 @@ export async function POST({ request, locals }) {
 export async function PATCH({ request, locals, url }) {
 	if (!locals.adminAuthed) error(401, 'Unauthorized');
 	const subdomain = url.searchParams.get('subdomain')?.trim().toLowerCase();
-	if (!subdomain) error(400, 'subdomain query required');
+	if (!subdomain) error(400, 'Link undangan wajib.');
 	let body: unknown;
 	try {
 		body = await request.json();
 	} catch {
-		error(400, 'Body harus JSON.');
+		error(400, 'Data tidak valid.');
 	}
 	const patch = (body ?? {}) as Record<string, unknown>;
 	if (patch.status && typeof patch.status === 'string' && !['draft', 'active', 'expired'].includes(patch.status)) error(400, 'status tidak valid.');
-	if (patch.dataJson != null && (typeof patch.dataJson !== 'object' || Array.isArray(patch.dataJson))) error(400, 'dataJson harus object.');
+	if (patch.dataJson != null && (typeof patch.dataJson !== 'object' || Array.isArray(patch.dataJson))) error(400, 'Data tidak valid.');
 	const row = await updateInvitation(subdomain, {
 		namaPihak1: typeof patch.namaPihak1 === 'string' ? patch.namaPihak1 : undefined,
 		namaPihak2: typeof patch.namaPihak2 === 'string' ? patch.namaPihak2 : undefined,
@@ -73,7 +73,7 @@ export async function PATCH({ request, locals, url }) {
 export async function DELETE({ url, locals }) {
 	if (!locals.adminAuthed) error(401, 'Unauthorized');
 	const subdomain = url.searchParams.get('subdomain')?.trim().toLowerCase();
-	if (!subdomain) error(400, 'subdomain query required');
+	if (!subdomain) error(400, 'Link undangan wajib.');
 	const ok = await deleteInvitation(subdomain);
 	if (!ok) error(404, 'Undangan tidak ditemukan.');
 	return json({ ok: true });

@@ -154,28 +154,35 @@
 	.names {
 		margin: 0;
 		display: flex;
-		align-items: baseline;
+		flex-direction: column;
+		align-items: center;
 		justify-content: center;
-		flex-wrap: wrap;
-		gap: 0.28em;
+		gap: 0.12em;
 		font-family: 'Great Vibes', 'Pinyon Script', cursive;
 		font-weight: 400;
 		font-size: clamp(42px, 11vw, 78px);
 		line-height: 1;
 		letter-spacing: 0.02em;
 		color: #fff;
+		text-align: center;
 		text-shadow: 0 4px 28px rgba(43, 43, 43, 0.85), 0 10px 44px rgba(43, 43, 43, 0.55);
 	}
 
+	.names .n {
+		display: block;
+	}
+
 	.names .amp {
+		display: flex;
+		align-items: center;
+		justify-content: center;
 		font-family: var(--font-serif);
 		font-style: italic;
 		font-weight: 300;
-		font-size: 0.42em;
-		letter-spacing: 0.08em;
+		font-size: 0.38em;
+		letter-spacing: 0.12em;
 		opacity: 0.92;
-		align-self: center;
-		transform: translateY(-0.15em);
+		line-height: 1;
 	}
 
 	.date {

@@ -4,7 +4,7 @@ import { db } from '$lib/server/db';
 export async function GET({ locals, url }) {
 	if (!locals.adminAuthed) error(401, 'Unauthorized');
 	const slug = url.searchParams.get('slug')?.trim();
-	if (!slug) error(400, 'slug required');
+	if (!slug) error(400, 'Undangan wajib.');
 	const fmt = url.searchParams.get('format');
 	if (fmt === 'xlsx' || fmt === 'pdf') {
 		const type = url.searchParams.get('type') === 'ucapan' ? 'ucapan' : 'tamu';
@@ -62,9 +62,9 @@ export async function GET({ locals, url }) {
 export async function DELETE({ locals, url }) {
 	if (!locals.adminAuthed) error(401, 'Unauthorized');
 	const slug = url.searchParams.get('slug')?.trim();
-	if (!slug) error(400, 'slug required');
+	if (!slug) error(400, 'Undangan wajib.');
 	const id = url.searchParams.get('id');
-	if (!id) error(400, 'id required');
+	if (!id) error(400, 'Data tidak valid.');
 	const sql = db();
 	const res = await sql`DELETE FROM guest_wishes WHERE id = ${id} AND wedding = ${slug}`;
 	if (res.count === 0) error(404, 'Ucapan tidak ditemukan.');

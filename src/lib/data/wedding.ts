@@ -165,6 +165,8 @@ export const wedding = {
 	// ---- Musik latar ----
 	// Offline: file di /static/audio/wedding.mp3 → diakses sebagai /audio/wedding.mp3
 	// youtubeId opsional sebagai fallback bila src kosong.
+	// Bisa diisi ID mentah (dQw4w9WgXcQ) ATAU link YouTube lengkap
+	// (https://youtu.be/... atau https://www.youtube.com/watch?v=...) — ID diekstrak otomatis.
 	music: {
 		src: '/audio/wedding.mp3',
 		youtubeId: '',
@@ -177,8 +179,6 @@ export const wedding = {
 		instagram: 'https://www.instagram.com/' // mis. https://instagram.com/username
 	},
 
-	// ---- Filter Instagram (kosongkan untuk menyembunyikan blok) ----
-	instagramFilterUrl: ''
 };
 
 // Alamat lengkap yang dipakai tombol "Save The Date" (Google Calendar)

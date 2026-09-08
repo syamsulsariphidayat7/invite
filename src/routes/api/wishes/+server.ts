@@ -4,13 +4,15 @@ import { getInvitation } from '$lib/server/invitations';
 import { wedding } from '$lib/data/wedding';
 import { checkRateLimit, clientKey } from '$lib/server/rateLimit';
 
+const FALLBACK_SLUG = 'demo';
+
 export async function GET({ url }) {
-	const slug = url.searchParams.get('slug')?.trim() || url.searchParams.get('wedding')?.trim() || wedding.slug;
+	const slug = url.searchParams.get('slug')?.trim() || url.searchParams.get('wedding')?.trim() || FALLBACK_SLUG;
 	const offset = Math.max(0, parseInt(url.searchParams.get('offset') ?? '0', 10) || 0);
 	const limitRaw = parseInt(url.searchParams.get('limit') ?? '30', 10) || 30;
 	const limit = Math.min(100, Math.max(1, limitRaw));
 	const inv = await getInvitation(slug).catch(() => null);
-	if (!inv && slug !== wedding.slug) error(404, 'Undangan tidak ditemukan.');
+	if (!inv && slug !== FALLBACK_SLUG) error(404, 'Undangan tidak ditemukan.');
 	const key = inv?.subdomain ?? slug;
 	const [wishes, total] = await Promise.all([listWishes(key, limit, offset), countWishes(key)]);
 	return json({ wishes, total });
@@ -60,25 +62,13 @@ export async function POST({ request, getClientAddress, url }) {
 		guestsNum = Math.floor(guestsNum);
 	}
 
-	const rawSlug = (typeof bodySlug === 'string' && bodySlug.trim()) ? bodySlug.trim() : (typeof bodyWedding === 'string' && bodyWedding.trim()) ? bodyWedding.trim() : qpSlug ?? wedding.slug;
+	const rawSlug = (typeof bodySlug === 'string' && bodySlug.trim()) ? bodySlug.trim() : (typeof bodyWedding === 'string' && bodyWedding.trim()) ? bodyWedding.trim() : qpSlug ?? FALLBACK_SLUG;
 	const inv = await getInvitation(rawSlug).catch(() => null);
-	if (!inv && rawSlug !== wedding.slug) error(404, 'Undangan tidak ditemukan.');
+	if (!inv && rawSlug !== FALLBACK_SLUG) error(404, 'Undangan tidak ditemukan.');
 	const slug = inv?.subdomain ?? rawSlug;
-	const turnstileToken = (body as Record<string, unknown>).turnstileToken as string | undefined;
-	const tt = url.searchParams.get('turnstileToken') ?? turnstileToken;
+	// Turnstile disabled
 	const { env } = await import('$env/dynamic/private');
-	if (env.TURNSTILE_SECRET_KEY) {
-		const secret = env.TURNSTILE_SECRET_KEY;
-		if (!tt?.trim()) error(400, 'Verifikasi captcha wajib.');
-		try {
-			const vr = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ secret, response: tt, remoteip: ip }) });
-			const vj = (await vr.json().catch(() => null)) as { success?: boolean } | null;
-			if (!vj?.success) error(400, 'Verifikasi captcha gagal.');
-		} catch (e) {
-			if ((e as { status?: number })?.status === 400) throw e;
-			error(400, 'Verifikasi captcha gagal.');
-		}
-	}
+	// skip validation
 
 	const wish = await addWish(slug, {
 		name: name.trim().slice(0, 120),

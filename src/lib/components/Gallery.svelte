@@ -2,7 +2,6 @@
 	import { ChevronLeft, ChevronRight, X } from 'lucide-svelte';
 	import { wedding } from '$lib/data/wedding';
 	import Photo from './Photo.svelte';
-	import SocialIcon from './SocialIcon.svelte';
 	import BatikTexture from './BatikTexture.svelte';
 
 	let { gallery = null, weddingData = null }: { gallery?: string[] | null; weddingData?: typeof wedding | null } = $props();
@@ -39,26 +38,6 @@
 <section id="gallery" class="gallery" aria-label="Galeri foto">
 	<BatikTexture variant="light" opacity={0.05} size={210} />
 	<div class="wrap">
-		<!-- Blok ajakan filter Instagram (disembunyikan jika kosong) -->
-		{#if w.instagramFilterUrl}
-			<div class="ig-promo" data-reveal>
-				<p>
-					Bantu kami mengabadikan momen terbaik di hari pernikahan kami dengan{' '}
-					<strong>“Instagram Filter”</strong> di stories. Jangan lupa tag kami ya!
-				</p>
-				<div class="ig-actions">
-					<a class="btn ig-btn" href={w.instagramFilterUrl} target="_blank" rel="noopener">
-						<SocialIcon size={15} />
-						Wedding Filter
-					</a>
-					<a class="btn ghost-ig" href={w.social.instagram} target="_blank" rel="noopener">
-						<SocialIcon size={15} />
-						Instagram
-					</a>
-				</div>
-			</div>
-		{/if}
-
 		<p class="kicker" data-reveal>Album Photos</p>
 		<h2 class="section-title" data-reveal style="--d:.06s">Our Memorable Moments</h2>
 		<p class="lead" data-reveal style="--d:.12s">Sebuah lembar cerita bahagia kami — galeri momen bersama keluarga & sahabat.</p>
@@ -120,48 +99,6 @@
 		margin: 0.9rem auto 2.6rem;
 		font-size: 15px;
 		color: var(--ink-2);
-	}
-
-	/* blok filter IG */
-	.ig-promo {
-		background: linear-gradient(135deg, #fdf2f4, #f7eef0 45%, #eef3e7);
-		border: 1px solid var(--line);
-		border-radius: 22px;
-		padding: 1.7rem 1.6rem;
-		margin-bottom: 3.2rem;
-		text-align: center;
-	}
-
-	.ig-promo p {
-		margin: 0 0 1.2rem;
-		font-size: 14.5px;
-		line-height: 1.9;
-		color: var(--ink-2);
-	}
-
-	.ig-promo strong {
-		color: var(--rose);
-	}
-
-	.ig-actions {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.7rem;
-		justify-content: center;
-	}
-
-	.ig-btn {
-		background: linear-gradient(45deg, #f09433, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888);
-		color: #fff;
-		border-radius: 999px;
-		padding: 0.7em 1.5em;
-	}
-
-	.ghost-ig {
-		border: 1px solid var(--line);
-		color: var(--ink-2);
-		border-radius: 999px;
-		padding: 0.7em 1.5em;
 	}
 
 	.grid {

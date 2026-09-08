@@ -1,13 +1,14 @@
 import { error } from '@sveltejs/kit';
 import { listWishes, countWishes } from '$lib/server/wishes';
 import { getInvitation } from '$lib/server/invitations';
-import { wedding } from '$lib/data/wedding';
 import { resolveWedding } from '$lib/data/resolve';
 import { DEFAULT_TEMPLATE } from '$lib/layouts/meta';
 
+const FALLBACK_SLUG = 'demo';
+
 export const load = async ({ params, url }) => {
 	const inv = await getInvitation(params.slug).catch(() => null);
-	if (!inv && params.slug !== wedding.slug) error(404, 'Undangan tidak ditemukan.');
+	if (!inv && params.slug !== FALLBACK_SLUG) error(404, 'Undangan tidak ditemukan.');
 	const isPreview = url.searchParams.get('preview') === '1';
 	if (inv && inv.status === 'draft' && !isPreview) error(404, 'Undangan belum tersedia.');
 	if (inv && inv.status === 'expired') error(410, 'Undangan telah berakhir.');

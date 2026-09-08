@@ -114,10 +114,10 @@
 
 	.names {
 		display: flex;
-		align-items: baseline;
+		flex-direction: column;
+		align-items: center;
 		justify-content: center;
-		gap: 0.5em;
-		flex-wrap: wrap;
+		gap: 0.1em;
 		margin: 0.4rem 0 0.2rem;
 		font-family: 'Great Vibes', 'Pinyon Script', cursive;
 		font-weight: 400;
@@ -125,15 +125,21 @@
 		line-height: 1;
 		letter-spacing: 0.02em;
 		color: #fff;
+		text-align: center;
 		text-shadow: 0 4px 30px rgba(0, 0, 0, 0.35);
 	}
 
 	.names .amp {
-		font-size: 0.42em;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 0.36em;
 		font-family: var(--font-serif);
+		font-style: italic;
+		font-weight: 300;
 		color: var(--gold);
-		transform: translateY(-0.3em);
-		letter-spacing: 0.1em;
+		letter-spacing: 0.12em;
+		line-height: 1;
 	}
 
 	.date {

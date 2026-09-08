@@ -18,8 +18,21 @@ export function setMusicSrc(src: string | null, startSeconds?: number) {
 }
 
 const src = (wedding.music as { src?: string }).src || '';
-const ytId = wedding.music.youtubeId;
+const ytId = extractYoutubeId(wedding.music.youtubeId);
 const startAt = wedding.music.startSeconds || 0;
+
+/** Ekstrak ID video dari ID mentah atau link YouTube lengkap. */
+function extractYoutubeId(input: string): string {
+	const trimmed = (input || '').trim();
+	if (!trimmed) return '';
+	// Sudah berupa ID mentah (11 karakter alfanumerik + -_)
+	if (/^[\w-]{11}$/.test(trimmed)) return trimmed;
+	// Link lengkap: youtu.be/..., youtube.com/watch?v=..., /shorts/, /embed/, /live/
+	const m = trimmed.match(
+		/(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/|live\/))([\w-]{11})/
+	);
+	return m ? m[1] : '';
+}
 
 function currentSrc(): string { return overrideSrc ?? src; }
 function currentStartAt(): number { return overrideStartAt ?? startAt; }

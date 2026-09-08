@@ -19,7 +19,11 @@
 		LogOut,
 		ExternalLink,
 		X,
-		ArrowLeft
+		ArrowLeft,
+		Moon,
+		Sun,
+		ChevronDown,
+		MessageSquare
 	} from 'lucide-svelte';
 
 	let { data } = $props();
@@ -33,11 +37,14 @@
 	}
 
 	let single = $state('');
+	let singleEl = $state<HTMLInputElement | null>(null);
 	let bulk = $state('');
 	let honey = $state('');
 	let guests = $state<GuestRow[]>([]);
 	let search = $state('');
 	let filter = $state<'all' | 'pending' | 'sent'>('all');
+	let curPage = $state(1);
+	const perPage = 5;
 	let copied = $state<string | null>(null);
 	let origin = $state('');
 	let showTemplate = $state(false);
@@ -47,6 +54,11 @@
 	let loading = $state(false);
 	let pinChecking = $state(false);
 	let selectedIds = $state<Set<string>>(new Set());
+	let dark = $state(false);
+	let showClearAll = $state(false);
+	let clearingAll = $state(false);
+	let confirmDeleteTarget = $state<GuestRow | null>(null);
+	let deletingSingle = $state(false);
 
 	let toast = $state<{ msg: string; type: 'ok' | 'err' } | null>(null);
 	let toastTimer: ReturnType<typeof setTimeout> | null = null;
@@ -59,10 +71,25 @@
 	const DEFAULT_TEMPLATE = `Halo {nama}, kamu diundang ke pernikahan Ruhaeni & Asep Roni 💍\n\nBuka undangannya di sini ya:\n{link}\n\nMohon doa & kehadirannya 🙏`;
 	let serverTemplate = $state<string | null>(null);
 	let template = $state(DEFAULT_TEMPLATE);
+	let templateEl = $state<HTMLTextAreaElement | null>(null);
+	let templateSaving = $state(false);
+	let templateSaveErr = $state('');
+	let templateTouched = $state(false);
+	let templateHydrated = $state(false);
 
 	const STORAGE_PIN = $derived(`undangan_pin_${slug}`);
 	const TEMPLATE_KEY = $derived(`undangan_wa_template_${slug}`);
+	const hasNama = $derived(template.includes('{nama}'));
+	const hasLink = $derived(template.includes('{link}'));
+	const templateError = $derived(!hasLink ? 'Pesan harus mengandung {link} agar tamu mendapat link undangan.' : null);
+	const templateWarn = $derived(hasLink && !hasNama ? 'Tambahkan {nama} untuk sapaan lebih personal.' : null);
 
+	function toggleDark() {
+		dark = !dark;
+		try {
+			localStorage.setItem('kelola_dark', dark ? '1' : '0');
+		} catch {}
+	}
 	function headers(): Record<string, string> {
 		return { 'x-pin': pin };
 	}
@@ -73,30 +100,70 @@
 		return base;
 	}
 
-	onMount(() => {
-		origin = window.location.origin;
-		fetch(`/api/guests/template?slug=${encodeURIComponent(slug)}`).then((r) => r.json().catch(() => null)).then((j) => {
-			if (j?.waTemplate?.trim()) { serverTemplate = j.waTemplate; template = j.waTemplate; }
-		}).catch(() => {});
+	onMount(async () => {
 		try {
-			const tmpl = localStorage.getItem(TEMPLATE_KEY);
-			if (tmpl && !serverTemplate) template = tmpl;
+			const saved = localStorage.getItem('kelola_dark');
+			dark = saved ? saved === '1' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+		} catch {}
+		origin = window.location.origin;
+		let localTmpl: string | null = null;
+		try { localTmpl = localStorage.getItem(TEMPLATE_KEY); } catch {}
+		let serverTmpl: string | null = null;
+		try {
+			const r = await fetch(`/api/guests/template?slug=${encodeURIComponent(slug)}`);
+			const j = await r.json().catch(() => null) as { waTemplate?: string } | null;
+			if (j?.waTemplate?.trim()) serverTmpl = j.waTemplate.trim();
+		} catch {}
+		if (serverTmpl) {
+			serverTemplate = serverTmpl;
+			if (localTmpl && localTmpl.trim() && localTmpl !== serverTmpl && localTmpl !== DEFAULT_TEMPLATE) {
+				template = localTmpl;
+			} else {
+				template = serverTmpl;
+			}
+		} else if (localTmpl && localTmpl.trim()) {
+			template = localTmpl;
+		}
+		queueMicrotask(() => { templateHydrated = true; });
+		try {
 			const qp = page.url.searchParams.get('pin');
 			const stored = sessionStorage.getItem(STORAGE_PIN) ?? localStorage.getItem(STORAGE_PIN);
 			if (qp && qp.length >= 4) {
 				pin = qp;
-				tryVerify();
+				await tryVerify();
 			} else if (stored && stored.length >= 4) {
 				pin = stored;
-				tryVerify();
+				await tryVerify();
 			}
 		} catch {}
 	});
 
+	let templateSaveTimer: ReturnType<typeof setTimeout> | null = null;
 	$effect(() => {
-		if (typeof window !== 'undefined') {
-			localStorage.setItem(TEMPLATE_KEY, template);
-		}
+		void template;
+		if (typeof window === 'undefined' || !templateHydrated) return;
+		try { localStorage.setItem(TEMPLATE_KEY, template); } catch {}
+		templateTouched = true;
+		if (templateSaveTimer) clearTimeout(templateSaveTimer);
+		templateSaveErr = '';
+		if (!authed || !hasLink) return;
+		templateSaveTimer = setTimeout(() => { void saveTemplate(); }, 900);
+	});
+	$effect(() => {
+		if (!showTemplate && !showClearAll && !confirmDeleteTarget) return;
+		if (typeof document !== 'undefined') document.body.style.overflow = 'hidden';
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key === 'Escape') {
+				showTemplate = false;
+				showClearAll = false;
+				confirmDeleteTarget = null;
+			}
+		};
+		window.addEventListener('keydown', onKey);
+		return () => {
+			if (typeof document !== 'undefined') document.body.style.overflow = '';
+			window.removeEventListener('keydown', onKey);
+		};
 	});
 
 	async function tryVerify() {
@@ -124,6 +191,9 @@
 				localStorage.setItem(STORAGE_PIN, pin);
 			} catch {}
 			history.replaceState(null, '', `/${slug}/kelola`);
+			if (templateHydrated && template.trim() !== (serverTemplate ?? '').trim() && hasLink) {
+				void saveTemplate();
+			}
 		} catch {
 			pinError = 'Gagal memverifikasi PIN.';
 		} finally {
@@ -148,7 +218,30 @@
 
 	function waMessageFor(name: string): string {
 		const link = linkFor(name);
-		return template.replace(/\{nama\}/g, name).replace(/\{link\}/g, link);
+		let msg = template;
+		if (!msg.includes('{link}')) msg = `${msg.trim()}\n\n{link}`;
+		return msg.replace(/\{nama\}/g, name).replace(/\{link\}/g, link);
+	}
+	function waPreview(): string { return waMessageFor('Budi Santoso'); }
+	function insertToken(tok: '{nama}' | '{link}') {
+		const el = templateEl;
+		if (!el) { if (!template.includes(tok)) template = `${template}${template.endsWith(' ') || template.endsWith('\n') ? '' : ' '}${tok}`; return; }
+		const s = el.selectionStart ?? template.length, e = el.selectionEnd ?? template.length;
+		template = `${template.slice(0, s)}${tok}${template.slice(e)}`;
+		requestAnimationFrame(() => { el.focus(); const p = s + tok.length; el.setSelectionRange(p, p); });
+	}
+	async function saveTemplate() {
+		if (!authed || !hasLink) return;
+		const val = template.trim();
+		if (!val || val === serverTemplate) return;
+		templateSaving = true; templateSaveErr = '';
+		try {
+			const res = await fetch(`/api/guests/template?slug=${encodeURIComponent(slug)}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers() }, body: JSON.stringify({ waTemplate: template }) });
+			const j = await res.json().catch(() => null);
+			if (!res.ok) { templateSaveErr = j?.message ?? 'Gagal menyimpan template.'; return; }
+			serverTemplate = j?.waTemplate ?? template;
+			try { localStorage.setItem(TEMPLATE_KEY, template); } catch {}
+		} catch { templateSaveErr = 'Gagal menyimpan.'; } finally { templateSaving = false; }
 	}
 
 	function waLink(name: string): string {
@@ -176,6 +269,11 @@
 	}
 
 	function handleSendWa(g: GuestRow) {
+		if (!hasLink) {
+			notify('Perbaiki template — harus mengandung {link}.', 'err');
+			showTemplate = true;
+			return;
+		}
 		patchSent(g, true);
 	}
 
@@ -185,22 +283,37 @@
 
 	async function copy(text: string, id: string) {
 		try {
-			await navigator.clipboard.writeText(text);
+			if (navigator.clipboard?.writeText) {
+				await navigator.clipboard.writeText(text);
+			} else throw new Error('no clipboard');
 		} catch {
-			const ta = document.createElement('textarea');
-			ta.value = text;
-			document.body.appendChild(ta);
-			ta.select();
-			document.execCommand('copy');
-			ta.remove();
+			try {
+				const ta = document.createElement('textarea');
+				ta.value = text;
+				document.body.appendChild(ta);
+				ta.select();
+				document.execCommand('copy');
+				ta.remove();
+			} catch {
+				notify('Gagal menyalin — salin manual.', 'err');
+				return;
+			}
 		}
 		copied = id;
 		setTimeout(() => (copied = null), 1800);
+		notify('Tersalin.');
 	}
 
 	async function addSingle() {
 		const n = single.trim();
-		if (!n || n.length < 2) return;
+		if (!n || n.length < 2) {
+			notify('Nama minimal 2 karakter.', 'err');
+			return;
+		}
+		if (!authed) {
+			notify('Masuk dengan PIN terlebih dahulu.', 'err');
+			return;
+		}
 		loading = true;
 		try {
 			const res = await fetch(apiUrl('', ''), {
@@ -208,20 +321,22 @@
 				headers: { 'content-type': 'application/json', ...headers() },
 				body: JSON.stringify({ names: [n], website: honey })
 			});
+			const j = await res.json().catch(() => null);
 			if (!res.ok) {
-				const j = await res.json().catch(() => null);
 				notify(j?.message ?? 'Gagal menambah tamu.', 'err');
 				return;
 			}
-			const j = await res.json();
 			const added: GuestRow[] = (j.added ?? []).map((g: GuestRow) => ({ id: g.id, name: g.name, sent: g.sent, sentAt: g.sentAt }));
 			if (added.length === 0) {
 				notify('Nama sudah ada.', 'err');
 			} else {
 				guests = [...guests, ...added];
 				notify(`${added.length} tamu ditambahkan.`);
+				single = '';
+				requestAnimationFrame(() => singleEl?.focus());
 			}
-			single = '';
+		} catch {
+			notify('Gagal terhubung.', 'err');
 		} finally {
 			loading = false;
 		}
@@ -229,7 +344,14 @@
 
 	async function addBulk() {
 		const lines = bulk.split('\n').map((s) => s.trim()).filter(Boolean);
-		if (!lines.length) return;
+		if (!lines.length) {
+			notify('Masukkan minimal 1 nama.', 'err');
+			return;
+		}
+		if (!authed) {
+			notify('Masuk dengan PIN terlebih dahulu.', 'err');
+			return;
+		}
 		loading = true;
 		try {
 			const res = await fetch(apiUrl('', ''), {
@@ -237,52 +359,93 @@
 				headers: { 'content-type': 'application/json', ...headers() },
 				body: JSON.stringify({ names: lines, website: honey })
 			});
+			const j = await res.json().catch(() => null);
 			if (!res.ok) {
-				const j = await res.json().catch(() => null);
 				notify(j?.message ?? 'Gagal import.', 'err');
 				return;
 			}
-			const j = await res.json();
 			const added: GuestRow[] = (j.added ?? []).map((g: GuestRow) => ({ id: g.id, name: g.name, sent: g.sent, sentAt: g.sentAt }));
 			guests = [...guests, ...added];
 			if (added.length < lines.length) {
-				notify(`${added.length} ditambahkan, ${lines.length - added.length} duplikat dilewati.`, 'err');
+				notify(`${added.length} ditambahkan, ${lines.length - added.length} duplikat dilewati.`, added.length ? 'ok' : 'err');
 			} else {
 				notify(`${added.length} tamu diimport.`);
 			}
-			bulk = '';
+			if (added.length) bulk = '';
+		} catch {
+			notify('Gagal terhubung.', 'err');
 		} finally {
 			loading = false;
 		}
 	}
 
+	async function refreshGuests() {
+		try {
+			const res = await fetch(apiUrl('', ''), { headers: headers() });
+			if (!res.ok) return;
+			const j = await res.json();
+			guests = (j.guests ?? []).map((g: GuestRow) => ({ id: g.id, name: g.name, sent: g.sent, sentAt: g.sentAt }));
+			const ids = new Set(guests.map((g) => g.id));
+			selectedIds = new Set([...selectedIds].filter((id) => ids.has(id)));
+		} catch {}
+	}
+
 	async function removeRow(g: GuestRow) {
-		if (!confirm(`Hapus "${g.name}" dari daftar?`)) return;
-		const res = await fetch(apiUrl('', `&id=${encodeURIComponent(g.id)}`), {
-			method: 'DELETE',
-			headers: headers()
-		});
-		if (!res.ok) {
-			const j = await res.json().catch(() => null);
-			notify(j?.message ?? 'Gagal menghapus.', 'err');
-			return;
+		if (deletingSingle) return;
+		deletingSingle = true;
+		try {
+			const res = await fetch(apiUrl('', `&id=${encodeURIComponent(g.id)}`), {
+				method: 'DELETE',
+				headers: headers()
+			});
+			if (!res.ok) {
+				const j = await res.json().catch(() => null);
+				if (res.status === 401) {
+					notify('PIN salah — masuk ulang.', 'err');
+					authed = false;
+				} else {
+					notify(j?.message ?? 'Gagal menghapus.', 'err');
+				}
+				return;
+			}
+			guests = guests.filter((x) => x.id !== g.id);
+			selectedIds = new Set([...selectedIds].filter((id) => id !== g.id));
+			confirmDeleteTarget = null;
+			notify(`"${g.name}" dihapus.`);
+			void refreshGuests();
+		} catch {
+			notify('Gagal terhubung.', 'err');
+		} finally {
+			deletingSingle = false;
 		}
-		guests = guests.filter((x) => x.id !== g.id);
-		selectedIds.delete(g.id);
-		notify(`"${g.name}" dihapus.`);
 	}
 
 	async function clearAll() {
-		if (!confirm(`Hapus ${guests.length} tamu dari daftar?`)) return;
-		const res = await fetch(apiUrl('', '&all=1'), { method: 'DELETE', headers: headers() });
-		if (!res.ok) {
+		if (clearingAll || guests.length === 0) return;
+		clearingAll = true;
+		try {
+			const res = await fetch(apiUrl('', '&all=1'), { method: 'DELETE', headers: headers() });
 			const j = await res.json().catch(() => null);
-			notify(j?.message ?? 'Gagal menghapus semua.', 'err');
-			return;
+			if (!res.ok) {
+				if (res.status === 401) {
+					notify('PIN salah — masuk ulang.', 'err');
+					authed = false;
+				} else {
+					notify(j?.message ?? 'Gagal menghapus semua.', 'err');
+				}
+				return;
+			}
+			const deleted = typeof j?.deleted === 'number' ? j.deleted : guests.length;
+			guests = [];
+			selectedIds = new Set();
+			showClearAll = false;
+			notify(deleted ? `${deleted} tamu dihapus.` : 'Semua tamu dihapus.');
+			void refreshGuests();
+		} catch {
+			notify('Gagal terhubung.', 'err');
+		} finally {
+			clearingAll = false;
 		}
-		guests = [];
-		selectedIds = new Set();
-		notify('Semua tamu dihapus.');
 	}
 
 	function resetTemplate() {
@@ -321,6 +484,11 @@
 		notify('Link terpilih disalin.');
 	}
 	async function openSelectedWa() {
+		if (!hasLink) {
+			notify('Perbaiki template pesan — harus mengandung {link}.', 'err');
+			showTemplate = true;
+			return;
+		}
 		const sel = guests.filter((x) => selectedIds.has(x.id));
 		for (const g of sel) {
 			window.open(waLink(g.name), '_blank');
@@ -350,6 +518,19 @@
 			return true;
 		})
 	);
+	const totalPages = $derived(Math.max(1, Math.ceil(filteredGuests.length / perPage)));
+	const pagedGuests = $derived(filteredGuests.slice((curPage - 1) * perPage, curPage * perPage));
+
+	$effect(() => {
+		void filter;
+		void search;
+		curPage = 1;
+	});
+	$effect(() => {
+		void filteredGuests.length;
+		if (curPage > totalPages) curPage = totalPages;
+		if (curPage < 1) curPage = 1;
+	});
 
 	const stats = $derived({
 		total: guests.length,
@@ -362,7 +543,7 @@
 	<title>Kelola Tamu — {slug}</title>
 </svelte:head>
 
-<div class="shell">
+<div class="shell" class:dark={dark}>
 	<header class="topbar">
 		<div class="brand">
 			<div class="logo-mark">
@@ -371,7 +552,10 @@
 			<span class="brand-name">Kelola Tamu<em>/{slug}</em></span>
 		</div>
 		<div class="topbar-right">
-			<a class="btn btn-ghost sm" href="/{slug}" target="_blank" rel="noopener"><ExternalLink size={14} /> Lihat Undangan</a>
+			<a class="btn btn-ghost sm" href="/{slug}" target="_blank" rel="noopener"><ExternalLink size={14} /> Lihat</a>
+			<button class="btn btn-ghost sm theme-btn" onclick={toggleDark} title={dark ? 'Mode terang' : 'Mode gelap'} aria-label="Ganti tema">
+				{#if dark}<Sun size={15} />{:else}<Moon size={15} />{/if}
+			</button>
 			{#if authed}
 				<button class="icon-btn" onclick={logout} title="Keluar"><LogOut size={16} /></button>
 			{/if}
@@ -379,27 +563,20 @@
 	</header>
 
 	<main class="main">
-		<nav class="crumb">
-			<span class="crumb-cur">Undangan</span>
-			<span class="crumb-sep">/</span>
-			<a class="crumb-link" href="/{slug}">{slug}</a>
-			<span class="crumb-sep">/</span>
-			<span class="crumb-cur">Kelola Tamu</span>
-		</nav>
-
 		{#if !authed}
 			<div class="pin-wrap">
-				<div class="card pin-card">
+				<div class="pin-card card">
 					<div class="pin-ic"><Lock size={20} /></div>
 					<h1>Masuk dengan PIN</h1>
-					<p class="pin-desc">Masukkan PIN pengelola untuk mengelola daftar tamu <code>/{slug}</code>.</p>
+					<p class="pin-desc">Masukkan PIN pengelola untuk mengelola daftar tamu undangan ini.</p>
 					<label class="pin-field">
 						<input
 							type="password"
 							inputmode="numeric"
-							placeholder="Masukkan PIN (min 4 karakter)"
+							placeholder="Masukkan PIN"
 							bind:value={pin}
 							onkeydown={(e) => e.key === 'Enter' && tryVerify()}
+							autofocus
 						/>
 					</label>
 					{#if pinError}
@@ -408,167 +585,86 @@
 					<button class="btn btn-primary" onclick={tryVerify} disabled={pinChecking}>
 						{pinChecking ? 'Memeriksa…' : 'Masuk'}
 					</button>
-					<p class="pin-hint">
-						PIN disimpan 24 jam di perangkat ini. Admin mengatur PIN di panel admin → kolom <em>PIN Kelola</em>. Jika kosong, gunakan <code>000000</code> (dev).
-					</p>
+					<p class="pin-hint">PIN disimpan 24 jam di perangkat ini. Hubungi penyelenggara jika lupa PIN.</p>
 				</div>
 			</div>
 		{:else}
-			<header class="page-head">
-				<div>
-					<h1>Kelola Tamu</h1>
-					<p>Tambah nama, salin link undangan, kirim WA, dan tandai terkirim — tersinkron lintas device.</p>
-				</div>
-				<a class="btn btn-ghost" href="/{slug}" target="_blank" rel="noopener"><ExternalLink size={14} /> Buka Undangan</a>
-			</header>
-
-			<div class="kpis">
-				<div class="kpi">
-					<div class="kpi-ic" style="--c:#2563eb;--bg:#eff6ff"><Users size={16} /></div>
-					<div><strong>{stats.total}</strong><span>Total Tamu</span></div>
-				</div>
-				<div class="kpi">
-					<div class="kpi-ic" style="--c:#059669;--bg:#ecfdf5"><CheckCircle2 size={16} /></div>
-					<div><strong>{stats.sent}</strong><span>Sudah Dikirim</span></div>
-				</div>
-				<div class="kpi">
-					<div class="kpi-ic" style="--c:#d97706;--bg:#fffbeb"><Circle size={16} /></div>
-					<div><strong>{stats.pending}</strong><span>Belum Dikirim</span></div>
-				</div>
-			</div>
-
 			<div class="card pad form-card">
-				<input type="text" bind:value={honey} tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;pointer-events:none;" />
-				<div class="f-row">
-					<label>
-						<span>Tambahkan satu tamu</span>
-						<div class="row">
-							<input
-								placeholder="Nama tamu, mis. Bapak Budi / Siti & Keluarga"
-								bind:value={single}
-								onkeydown={(e) => e.key === 'Enter' && addSingle()}
-								disabled={loading}
-							/>
-							<button class="btn btn-primary" onclick={addSingle} disabled={loading}>
-								<UserPlus size={15} /> Tambah
-							</button>
-						</div>
-					</label>
-					<label>
-						<span>Import banyak sekaligus (satu nama per baris)</span>
-						<div class="row bulk-row">
-							<textarea
-								rows="3"
-								placeholder="Budi Santoso&#10;Siti & Keluarga&#10;Kak Andi & Partner"
-								bind:value={bulk}
-								disabled={loading}
-							></textarea>
-							<button class="btn btn-ghost" onclick={addBulk} disabled={loading}>
-								<Upload size={15} /> Import Nama
-							</button>
-						</div>
-					</label>
+				<div class="form-card-head">
+					<h3 class="sec-title"><UserPlus size={15} /> Tambah Tamu</h3>
+					<button type="button" class="btn btn-primary sm" onclick={() => (showTemplate = true)}><MessageSquare size={14} /> Atur Format Pesan Whatsapp</button>
 				</div>
-
-				<div class="template-area">
-					<button type="button" class="btn-text" onclick={() => (showTemplate = !showTemplate)}>
-						<SlidersHorizontal size={13} />
-						{showTemplate ? 'Tutup Pengaturan Pesan WA' : 'Ubah Format Pesan WhatsApp'}
-					</button>
-
-					{#if showTemplate}
-						<div class="template-box">
-							<label>
-								<span>Format Pesan WA (gunakan <code>{'{nama}'}</code> dan <code>{'{link}'}</code>)</span>
-								<textarea rows="4" bind:value={template}></textarea>
-							</label>
-							<div class="tmpl-actions">
-								<button type="button" class="btn-subtle" onclick={resetTemplate}>
-									<RotateCcw size={12} /> Reset ke Pesan Default
-								</button>
-							</div>
-						</div>
-					{/if}
-				</div>
+				<pre class="tmpl-preview-full" title={waPreview()}>{waPreview()}</pre>
+				<input type="text" bind:value={honey} tabindex="-1" autocomplete="off" aria-hidden="true" class="honey" />
+				<label>
+					<span>Nama tamu</span>
+					<div class="row">
+						<input
+							bind:this={singleEl}
+							placeholder="Contoh Anaya & Keluarga"
+							bind:value={single}
+							onkeydown={(e) => e.key === 'Enter' && addSingle()}
+							disabled={loading}
+							autofocus
+						/>
+						<button class="btn btn-primary" onclick={addSingle} disabled={loading}>
+							<UserPlus size={15} /> Tambah
+						</button>
+					</div>
+				</label>
 			</div>
 
 			<div class="filter-bar">
-				<div class="tabs">
-					<button type="button" class:active={filter === 'all'} onclick={() => (filter = 'all')}>
-						Semua <b>({stats.total})</b>
-					</button>
-					<button type="button" class:active={filter === 'pending'} onclick={() => (filter = 'pending')}>
-						Belum Dikirim <b>({stats.pending})</b>
-					</button>
-					<button type="button" class:active={filter === 'sent'} onclick={() => (filter = 'sent')}>
-						Sudah Terkirim <b>({stats.sent})</b>
-					</button>
-				</div>
 				<div class="search-box">
 					<Search size={14} class="search-icon" />
 					<input type="text" placeholder="Cari nama tamu…" bind:value={search} />
 				</div>
-			</div>
-
-			{#if guests.length > 0}
-				<div class="bulk-bar">
-					<label class="bulk-check"><input type="checkbox" checked={selectedIds.size === filteredGuests.length && filteredGuests.length > 0} onchange={selectedIds.size === filteredGuests.length ? clearSelection : selectAllFiltered} /> Pilih semua ({filteredGuests.length})</label>
-					{#if selectedIds.size > 0}
-						<span class="bulk-count">{selectedIds.size} dipilih</span>
-						<button class="btn btn-ghost sm" onclick={copySelectedLinks}>Salin Link ({selectedIds.size})</button>
-						<button class="btn btn-primary sm" onclick={openSelectedWa}>Kirim WA ({selectedIds.size})</button>
-						<button class="btn btn-ghost sm" onclick={() => markSelectedSent(true)}>Tandai terkirim</button>
-						<button class="btn btn-ghost sm" onclick={clearSelection}>Batal</button>
+				<div class="filter-left">
+					<div class="tabs">
+						<button type="button" class:active={filter === 'all'} onclick={() => (filter = 'all')}>
+							Semua <b>({stats.total})</b>
+						</button>
+						<button type="button" class:active={filter === 'pending'} onclick={() => (filter = 'pending')}>
+							Belum <b>({stats.pending})</b>
+						</button>
+						<button type="button" class:active={filter === 'sent'} onclick={() => (filter = 'sent')}>
+							Terkirim <b>({stats.sent})</b>
+						</button>
+					</div>
+					{#if guests.length > 0}
+						<button class="btn danger-ghost sm" onclick={() => (showClearAll = true)} disabled={clearingAll} title="Hapus seluruh daftar tamu"><Trash2 size={13} /> Hapus Semua ({guests.length})</button>
 					{/if}
 				</div>
-			{/if}
+			</div>
 
 			<div class="list">
 				{#if filteredGuests.length === 0}
 					<div class="empty">
 						{#if guests.length === 0}
 							<strong>Belum ada tamu</strong>
-							<p>Tambahkan nama di form atas.</p>
+							<p>Tambahkan nama di form atas, lalu kirim link undangan via WhatsApp.</p>
 						{:else}
 							<strong>Tidak ada hasil</strong>
 							<p>Tidak ada tamu yang cocok dengan filter atau pencarian.</p>
 						{/if}
 					</div>
 				{:else}
-					{#each filteredGuests as g, i}
+					{#each pagedGuests as g, i}
 						<article class="item" class:is-sent={g.sent}>
-							<label class="bulk-cb"><input type="checkbox" checked={selectedIds.has(g.id)} onchange={() => toggleSelect(g.id)} /></label>
-							<button
-								type="button"
-								class="btn-check"
-								class:checked={g.sent}
-								onclick={() => toggleSent(g)}
-								title={g.sent ? 'Tandai belum dikirim' : 'Tandai sudah dikirim'}
-								aria-label="Status terkirim"
-							>
-								{#if g.sent}
-									<CheckCircle2 size={19} />
-								{:else}
-									<Circle size={19} />
-								{/if}
-							</button>
 							<div class="info">
 								<div class="name-row">
-									<div class="li-avatar">{(g.name || '?')[0].toUpperCase()}</div>
+									<div class="li-avatar" style="--hue:{(g.name.charCodeAt(0) * 47) % 360}">{(g.name || '?')[0].toUpperCase()}</div>
 									<strong>{g.name}</strong>
-									{#if g.sent}<span class="pill ok"><span class="dot"></span>Terkirim</span>{/if}
 								</div>
-								<a class="link" href={linkFor(g.name)} target="_blank" rel="noopener">
-									<Link2 size={12} /> {linkFor(g.name)}
-								</a>
 							</div>
 							<div class="actions">
+								{#if g.sent}<span class="pill ok"><span class="dot"></span>Terkirim</span>{/if}
 								<button
 									class="icon-btn"
 									class:ok={copied === `copy-${g.id}`}
 									onclick={() => copy(linkFor(g.name), `copy-${g.id}`)}
 									aria-label="Salin link"
-									title="Salin Link Undangan"
+									title="Salin Link"
 								>
 									{#if copied === `copy-${g.id}`}<Check size={15} />{:else}<Copy size={15} />{/if}
 								</button>
@@ -583,26 +679,91 @@
 								>
 									<Send size={15} />
 								</a>
-								<button class="icon-btn danger" onclick={() => removeRow(g)} aria-label="Hapus" title="Hapus dari daftar">
+								<button class="icon-btn danger" onclick={() => (confirmDeleteTarget = g)} aria-label="Hapus" title="Hapus" disabled={deletingSingle}>
 									<Trash2 size={15} />
 								</button>
 							</div>
 						</article>
 					{/each}
+					<div class="pagination">
+						<button type="button" class="page-btn" disabled={curPage <= 1} onclick={() => (curPage -= 1)}>‹ Sebelumnya</button>
+						<span class="page-info">{curPage} / {totalPages} · {filteredGuests.length} tamu</span>
+						<button type="button" class="page-btn" disabled={curPage >= totalPages} onclick={() => (curPage += 1)}>Berikutnya ›</button>
+					</div>
 				{/if}
 			</div>
 
-			{#if guests.length > 0}
-				<div class="bottom-actions">
-					<button class="btn danger-ghost sm" onclick={clearAll}>
-						<Trash2 size={13} /> Hapus Semua Daftar ({guests.length})
-					</button>
-				</div>
-			{/if}
-
-			<a class="back" href="/{slug}"><ArrowLeft size={14} /> Kembali ke undangan</a>
 		{/if}
 	</main>
+
+	{#if showTemplate}
+		<div class="modal" role="dialog" aria-modal="true" aria-label="Format Pesan WhatsApp">
+			<button class="modal-backdrop" aria-label="Tutup" onclick={() => (showTemplate = false)}></button>
+			<div class="modal-card">
+				<div class="modal-head">
+					<h3><MessageSquare size={16} /> Format Pesan WhatsApp</h3>
+					<button class="icon-btn sm" aria-label="Tutup" onclick={() => (showTemplate = false)}><X size={16} /></button>
+				</div>
+				<p class="modal-desc">Atur template yang dikirim ke tamu via WhatsApp.</p>
+				<div class="tmpl-notice warn">
+					<X size={14} class="tmpl-notice-icon" />
+					<div class="tmpl-notice-text">Jangan hapus <code>{'{nama}'}</code> dan <code>{'{link}'}</code> — keduanya akan diganti otomatis dengan nama tamu & link undangan.</div>
+				</div>
+				<div class="tmpl-status">
+					{#if templateSaving}<span class="hint saving">Menyimpan…</span>{:else if !templateError && templateTouched && hasLink}<span class="hint ok">Tersimpan otomatis</span>{/if}
+				</div>
+				{#if templateError}<p class="alert err" role="alert"><X size={14} /> {templateError}</p>{:else if templateWarn}<p class="alert warn"><X size={14} /> {templateWarn}</p>{/if}
+				{#if templateSaveErr}<p class="alert err">{templateSaveErr}</p>{/if}
+				<label class="tmpl-textarea">
+					<textarea bind:this={templateEl} rows="10" bind:value={template} placeholder="Halo ..."></textarea>
+					<span class="hint">{template.length} / 2000 karakter</span>
+				</label>
+				<div class="modal-actions">
+					<button type="button" class="btn btn-ghost" onclick={() => (showTemplate = false)}>Batal</button>
+					<button type="button" class="btn btn-ghost sm" onclick={resetTemplate}><RotateCcw size={12} /> Reset default</button>
+					<button type="button" class="btn btn-primary" onclick={async () => { await saveTemplate(); if (!templateError && !templateSaveErr) showTemplate = false; }} disabled={!hasLink || templateSaving}>{templateSaving ? 'Menyimpan…' : 'Simpan'}</button>
+				</div>
+			</div>
+		</div>
+	{/if}
+
+	{#if confirmDeleteTarget}
+		<div class="modal" role="dialog" aria-modal="true" aria-label="Hapus tamu">
+			<button class="modal-backdrop" aria-label="Tutup" onclick={() => !deletingSingle && (confirmDeleteTarget = null)}></button>
+			<div class="modal-card">
+				<div class="modal-head">
+					<h3><Trash2 size={16} /> Hapus Tamu?</h3>
+					<button class="icon-btn sm" aria-label="Tutup" onclick={() => !deletingSingle && (confirmDeleteTarget = null)} disabled={deletingSingle}><X size={16} /></button>
+				</div>
+				<p class="modal-desc">Hapus <strong>“{confirmDeleteTarget.name}”</strong> dari daftar <code>/{slug}</code>? Tindakan tidak dapat dibatalkan.</p>
+				<div class="modal-actions">
+					<button type="button" class="btn btn-ghost" onclick={() => (confirmDeleteTarget = null)} disabled={deletingSingle}>Batal</button>
+					<button type="button" class="btn btn-primary" style="background:var(--danger);border-color:var(--danger)" onclick={() => confirmDeleteTarget && removeRow(confirmDeleteTarget)} disabled={deletingSingle}>{deletingSingle ? 'Menghapus…' : 'Hapus'}</button>
+				</div>
+			</div>
+		</div>
+	{/if}
+
+	{#if showClearAll}
+		<div class="modal" role="dialog" aria-modal="true" aria-label="Hapus semua tamu">
+			<button class="modal-backdrop" aria-label="Tutup" onclick={() => !clearingAll && (showClearAll = false)}></button>
+			<div class="modal-card">
+				<div class="modal-head">
+					<h3><Trash2 size={16} /> Hapus Semua Tamu?</h3>
+					<button class="icon-btn sm" aria-label="Tutup" onclick={() => !clearingAll && (showClearAll = false)} disabled={clearingAll}><X size={16} /></button>
+				</div>
+				<p class="modal-desc">Anda akan menghapus <strong>{guests.length} tamu</strong> dari daftar <code>/{slug}</code>. Tindakan ini tidak dapat dibatalkan dan PIN tetap diperlukan untuk menambah kembali.</p>
+				<div class="tmpl-notice warn">
+					<X size={14} class="tmpl-notice-icon" />
+					<div class="tmpl-notice-text">Pastikan Anda sudah menyalin atau mengekspor data jika diperlukan.</div>
+				</div>
+				<div class="modal-actions">
+					<button type="button" class="btn btn-ghost" onclick={() => (showClearAll = false)} disabled={clearingAll}>Batal</button>
+					<button type="button" class="btn btn-primary" style="background:var(--danger);border-color:var(--danger)" onclick={clearAll} disabled={clearingAll}>{clearingAll ? 'Menghapus…' : `Hapus ${guests.length} Tamu`}</button>
+				</div>
+			</div>
+		</div>
+	{/if}
 
 	{#if toast}
 		<div class="toast" class:err={toast.type === 'err'} role="status">
@@ -628,9 +789,10 @@
 		--ok: #16a34a;
 		--ok-bg: #f0fdf4;
 		--warn: #d97706;
+		--warn-bg: #fffbeb;
 		--danger: #dc2626;
 		--danger-bg: #fef2f2;
-		--radius: 12px;
+		--radius: 14px;
 		--shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
 		--shadow-lg: 0 16px 40px rgba(15, 23, 42, 0.14);
 
@@ -643,6 +805,22 @@
 	}
 	.shell * {
 		box-sizing: border-box;
+	}
+	.honey {
+		position: absolute;
+		left: -9999px;
+		opacity: 0;
+		height: 0;
+		pointer-events: none;
+	}
+	.sec-title {
+		display: flex;
+		align-items: center;
+		gap: 0.45em;
+		margin: 0 0 0.8rem;
+		font-size: 14px;
+		font-weight: 700;
+		color: var(--ink);
 	}
 
 	/* ===== Topbar ===== */
@@ -799,17 +977,39 @@
 	}
 	.card.pad {
 		padding: 1.2rem;
+		min-width: 0;
+		overflow: hidden;
 	}
 	.form-card {
 		display: grid;
 		gap: 1rem;
 		margin-bottom: 1.2rem;
 	}
+	.form-card-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+		flex-wrap: wrap;
+	}
+	.form-card-head .sec-title { margin: 0; }
+	.tmpl-preview-full {
+		background: var(--bg);
+		border: 1px solid var(--line);
+		border-radius: 10px;
+		padding: 0.7rem 0.85rem;
+		font-size: 12.5px;
+		line-height: 1.65;
+		color: var(--ink-2);
+		white-space: pre-wrap;
+		word-break: break-word;
+	}
 	.f-row {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
 		gap: 1rem;
 	}
+	.f-row > label { min-width: 0; }
 	.form-card label span {
 		display: flex;
 		align-items: center;
@@ -825,7 +1025,9 @@
 		display: grid;
 		grid-template-columns: 1fr auto;
 		gap: 0.6rem;
+		min-width: 0;
 	}
+	.row input { min-width: 0; }
 	.bulk-row {
 		grid-template-columns: 1fr;
 		align-items: stretch;
@@ -859,22 +1061,118 @@
 		display: grid;
 		gap: 0.6rem;
 	}
-	.btn-text {
-		background: transparent;
-		border: 0;
-		color: var(--ink-2);
-		font-size: 13px;
-		font-weight: 500;
-		font-family: inherit;
+	.tmpl-toggle {
+		width: 100%;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		text-align: left;
+		background: var(--bg);
+		border: 1px solid var(--line);
+		border-radius: 12px;
+		padding: 0.85rem 1rem;
 		cursor: pointer;
+		font-family: inherit;
+		transition:
+			border-color 0.15s ease,
+			background 0.15s ease;
+	}
+	.tmpl-toggle:hover {
+		border-color: var(--accent);
+		background: var(--accent-soft);
+	}
+	.tmpl-toggle.compact { padding: 0.6rem 0.85rem; border-radius: 10px; }
+	.tmpl-toggle-left {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		min-width: 0;
+	}
+	.tmpl-toggle-icon {
+		flex: none;
+		width: 30px;
+		height: 30px;
+		border-radius: 8px;
+		display: grid;
+		place-items: center;
+		background: var(--accent);
+		color: #fff;
+	}
+	.tmpl-toggle-text {
+		display: flex;
+		align-items: baseline;
+		gap: 0.45rem;
+		min-width: 0;
+		flex-wrap: wrap;
+	}
+	.tmpl-toggle-text strong {
+		font-size: 13px;
+		color: var(--ink);
+		line-height: 1.2;
+	}
+	.tmpl-toggle-text > span {
+		font-size: 11px;
+		color: var(--ink-3);
+		line-height: 1;
+		display: inline-flex;
+		gap: 0.25rem;
+	}
+	.tmpl-toggle-text code {
+		background: var(--card);
+		border: 1px solid var(--line);
+		padding: 0.05em 0.3em;
+		border-radius: 4px;
+		font-size: 10px;
+		color: var(--ink-2);
+	}
+	.tmpl-toggle-right {
+		flex: none;
 		display: inline-flex;
 		align-items: center;
-		gap: 0.45em;
-		padding: 0;
-		justify-self: start;
-	}
-	.btn-text:hover {
+		gap: 0.4rem;
 		color: var(--accent-strong);
+		font-size: 12px;
+		font-weight: 600;
+	}
+	.tmpl-toggle-action {
+		white-space: nowrap;
+	}
+	.chev {
+		transition: transform 0.2s ease;
+	}
+	.chev.open {
+		transform: rotate(180deg);
+	}
+	.tmpl-collapsed.compact {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
+		background: var(--card);
+		border: 1px solid var(--line-soft);
+		border-radius: 10px;
+		padding: 0.5rem 0.75rem;
+		min-width: 0;
+		overflow: hidden;
+	}
+	.tmpl-collapsed-preview {
+		flex: 1;
+		min-width: 0;
+		font-size: 12px;
+		color: var(--ink-2);
+		line-height: 1.4;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.tmpl-collapsed.compact .badge {
+		flex: none;
+		white-space: nowrap;
+	}
+	.badge.sm {
+		font-size: 10px;
+		padding: 0.1em 0.5em;
 	}
 	.template-box {
 		background: var(--bg);
@@ -884,40 +1182,172 @@
 		display: grid;
 		gap: 0.6rem;
 	}
-	.template-box code {
-		background: #fff;
-		border: 1px solid var(--line);
-		padding: 0.1em 0.35em;
-		border-radius: 4px;
-		font-size: 11px;
+	.modal {
+		position: fixed;
+		inset: 0;
+		z-index: 60;
+		display: grid;
+		place-items: center;
+		padding: 1rem;
 	}
-	.tmpl-actions {
-		display: flex;
-		justify-content: flex-end;
-	}
-	.btn-subtle {
-		background: transparent;
+	.modal-backdrop {
+		position: absolute;
+		inset: 0;
 		border: 0;
-		color: var(--ink-3);
-		font-size: 12px;
-		font-family: inherit;
+		background: rgba(15, 23, 42, 0.55);
+		backdrop-filter: blur(4px);
 		cursor: pointer;
+	}
+	.modal-card {
+		position: relative;
+		width: min(100%, 560px);
+		max-height: min(92vh, 720px);
+		overflow: auto;
+		background: var(--card);
+		border: 1px solid var(--line);
+		border-radius: 16px;
+		box-shadow: var(--shadow-lg);
+		padding: 1.1rem;
+		display: grid;
+		gap: 0.75rem;
+		z-index: 1;
+	}
+	.modal-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+	}
+	.modal-head h3 {
+		margin: 0;
 		display: inline-flex;
 		align-items: center;
-		gap: 0.3em;
+		gap: 0.45rem;
+		font-size: 15px;
+		font-weight: 700;
+		color: var(--ink);
 	}
-	.btn-subtle:hover {
-		color: var(--ink-2);
+	.modal-desc {
+		margin: 0;
+		font-size: 12.5px;
+		color: var(--ink-3);
+	}
+	.modal-desc code {
+		background: var(--bg);
+		border: 1px solid var(--line);
+		padding: 0.05em 0.3em;
+		border-radius: 4px;
+		font-size: 10px;
+	}
+	.tmpl-textarea textarea {
+		min-height: 180px;
+	}
+	.modal-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.5rem;
+		flex-wrap: wrap;
+		padding-top: 0.2rem;
+		border-top: 1px solid var(--line-soft);
+	}
+	.tmpl-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.8rem;
+		flex-wrap: wrap;
+	}
+	.tmpl-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
+	.tmpl-chips { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+	.chip-btn {
+		display: inline-flex; align-items: center; gap: 0.35em;
+		border: 1px solid var(--line); background: var(--card); color: var(--ink-2);
+		border-radius: 999px; padding: 0.32em 0.75em; font-size: 12px; font-family: inherit; cursor: pointer;
+	}
+	.chip-btn span { font-family: ui-monospace, monospace; font-weight: 600; }
+	.chip-btn.on { background: var(--accent-soft); color: var(--accent-strong); border-color: #bfdbfe; }
+	.chip-btn:hover { border-color: #cbd5e1; }
+	.tmpl-status { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+	.badge { display: inline-flex; align-items: center; gap: 0.35em; font-size: 11px; font-weight: 600; border-radius: 999px; padding: 0.25em 0.6em; border: 1px solid var(--line); background: var(--card); color: var(--ink-2); }
+	.badge.ok { background: var(--ok-bg); color: var(--ok); border-color: #a7f3d0; }
+	.badge.warn { background: var(--warn-bg); color: var(--warn); border-color: #fde68a; }
+	.badge.err { background: var(--danger-bg); color: var(--danger); border-color: #fecaca; }
+	.badge .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+	.hint { font-size: 11px; color: var(--ink-3); }
+	.hint.ok { color: var(--ok); }
+	.hint.saving { color: var(--ink-2); }
+	.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+	.tmpl-preview { background: var(--card); border: 1px solid var(--line-soft); border-radius: 10px; padding: 0.7rem 0.85rem; }
+	.tmpl-preview-head { font-size: 11px; font-weight: 700; color: var(--ink-3); letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 0.4rem; }
+	.tmpl-preview-body { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: inherit; font-size: 13px; color: var(--ink-2); line-height: 1.6; }
+	.tmpl-actions { display: flex; gap: 0.5rem; justify-content: flex-end; flex-wrap: wrap; }
+	.btn-subtle {
+		background: transparent; border: 0; color: var(--ink-3); font-size: 12px; font-family: inherit; cursor: pointer;
+		display: inline-flex; align-items: center; gap: 0.3em;
+	}
+	.btn-subtle:hover { color: var(--ink-2); }
+	.alert.warn { color: var(--warn); background: var(--warn-bg); border: 1px solid #fde68a; }
+	.tmpl-notice {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.6em;
+		border-radius: 10px;
+		padding: 0.7em 0.85em;
+		font-size: 12.5px;
+		line-height: 1.65;
+		text-align: left;
+	}
+	.tmpl-notice.warn {
+		color: #92400e;
+		background: #fffbeb;
+		border: 1px solid #fde68a;
+	}
+	.tmpl-notice-icon { flex: none; margin-top: 0.15em; color: var(--warn); }
+	.tmpl-notice-text { flex: 1; min-width: 0; }
+	.tmpl-notice-text code {
+		background: #fff;
+		border: 1px solid #fde68a;
+		padding: 0.08em 0.35em;
+		border-radius: 5px;
+		font-size: 11px;
+		font-family: ui-monospace, monospace;
+		color: #92400e;
+		white-space: nowrap;
+	}
+	.shell.dark .tmpl-notice.warn {
+		background: #2b2007;
+		border-color: #7a5a12;
+		color: #fde68a;
+	}
+	.shell.dark .tmpl-notice-text code {
+		background: #1e293b;
+		border-color: #7a5a12;
+		color: #fde68a;
 	}
 
 	/* ===== Filter bar ===== */
 	.filter-bar {
 		display: grid;
-		grid-template-columns: 1fr minmax(200px, 280px);
-		gap: 0.8rem;
-		align-items: center;
+		gap: 0.7rem;
 		margin-bottom: 1rem;
 	}
+	.filter-left {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		flex-wrap: wrap;
+		min-width: 0;
+	}
+	.filter-left .tabs { align-items: center; }
+	.filter-left .tabs button,
+	.filter-left .btn {
+		height: 32px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		line-height: 1;
+	}
+	.filter-bar .search-box { width: 100%; }
 	.tabs {
 		display: flex;
 		gap: 0.4rem;
@@ -993,6 +1423,7 @@
 	.bulk-count {
 		color: var(--ink-3);
 	}
+	.bulk-spacer { flex: 1 1 auto; min-width: 0.5rem; }
 
 	/* ===== List ===== */
 	.list {
@@ -1000,10 +1431,10 @@
 		gap: 0.6rem;
 	}
 	.item {
-		display: grid;
-		grid-template-columns: auto auto 1fr auto;
-		gap: 0.75rem;
+		display: flex;
 		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
 		background: var(--card);
 		border: 1px solid var(--line-soft);
 		border-radius: 12px;
@@ -1031,13 +1462,17 @@
 		color: var(--ok);
 	}
 	.info {
+		flex: 1;
 		min-width: 0;
+		display: flex;
+		align-items: center;
 	}
 	.name-row {
 		display: flex;
 		align-items: center;
 		gap: 0.55em;
 		min-width: 0;
+		flex: 1;
 	}
 	.li-avatar {
 		flex: none;
@@ -1052,7 +1487,7 @@
 		background: var(--accent-soft);
 	}
 	.info strong {
-		font-size: 14.5px;
+		font-size: 13px;
 		color: var(--ink);
 		white-space: nowrap;
 		overflow: hidden;
@@ -1101,8 +1536,41 @@
 	}
 	.actions {
 		display: flex;
+		align-items: center;
 		gap: 0.35rem;
+		flex: none;
 	}
+	.pagination {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.8rem;
+		margin-top: 0.8rem;
+	}
+	.page-btn {
+		border: 1px solid var(--accent);
+		background: var(--accent);
+		color: #fff;
+		border-radius: 999px;
+		padding: 0.4em 0.9em;
+		font-size: 12px;
+		font-family: inherit;
+		cursor: pointer;
+		box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
+		transition: background 0.15s ease, opacity 0.15s ease;
+	}
+	.page-btn:hover:not(:disabled) { background: var(--accent-strong); border-color: var(--accent-strong); }
+	.page-btn:disabled { opacity: 0.45; cursor: default; background: var(--card); color: var(--ink-3); border-color: var(--line); box-shadow: none; }
+	.page-info {
+		font-size: 11px;
+		font-weight: 600;
+		color: var(--accent-strong);
+		background: var(--accent-soft);
+		border: 1px solid #bfdbfe;
+		border-radius: 999px;
+		padding: 0.25em 0.7em;
+	}
+	.shell.dark .page-info { background: var(--accent-soft); border-color: #1e3a5f; }
 
 	/* ===== Buttons ===== */
 	.btn {
@@ -1345,6 +1813,104 @@
 		}
 	}
 
+	/* ===== Dark mode ===== */
+	.shell.dark {
+		--bg: #0f172a;
+		--card: #1e293b;
+		--line: #334155;
+		--line-soft: #283548;
+		--ink: #e2e8f0;
+		--ink-2: #94a3b8;
+		--ink-3: #64748b;
+		--accent: #3b82f6;
+		--accent-strong: #60a5fa;
+		--accent-soft: #17294d;
+		--ok: #4ade80;
+		--ok-bg: #0d2a1c;
+		--warn: #fbbf24;
+		--warn-bg: #2b2007;
+		--danger: #f87171;
+		--danger-bg: #331118;
+		--shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.35);
+		--shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55);
+		color-scheme: dark;
+	}
+	.shell.dark input,
+	.shell.dark textarea,
+	.shell.dark select,
+	.shell.dark .search-box input,
+	.shell.dark .template-box textarea {
+		background: #0f1f39;
+		color: var(--ink);
+		border-color: var(--line);
+	}
+	.shell.dark input::placeholder,
+	.shell.dark textarea::placeholder,
+	.shell.dark .search-box input::placeholder,
+	.shell.dark .template-box textarea::placeholder {
+		color: var(--ink-3);
+	}
+	.shell.dark .card,
+	.shell.dark .item,
+	.shell.dark .bulk-bar,
+	.shell.dark .template-box,
+	.shell.dark .empty {
+		background: var(--card);
+		border-color: var(--line);
+	}
+	.shell.dark .item:hover {
+		border-color: #475569;
+	}
+	.shell.dark .item.is-sent {
+		background: #16213a;
+	}
+	.shell.dark .btn-ghost {
+		background: #0f1f39;
+		border-color: var(--line);
+		color: var(--ink-2);
+	}
+	.shell.dark .btn-ghost:hover {
+		background: #233047;
+		border-color: #475569;
+		color: var(--ink);
+	}
+	.shell.dark .icon-btn,
+	.shell.dark .tabs button {
+		background: #0f1f39;
+		border-color: var(--line);
+		color: var(--ink-2);
+	}
+	.shell.dark .tabs button.active {
+		background: var(--accent);
+		color: #fff;
+		border-color: transparent;
+	}
+	.shell.dark .topbar {
+		background: var(--card);
+		border-color: var(--line);
+	}
+	.shell.dark .pill.ok {
+		border-color: #1c6b46;
+	}
+	.shell.dark .icon-btn.wa {
+		background: var(--ok-bg);
+		border-color: #1c6b46;
+	}
+	.shell.dark .kpi {
+		background: var(--card);
+		border-color: var(--line);
+	}
+	.shell.dark .link:hover {
+		color: var(--accent-strong);
+	}
+	.shell.dark .pin-card,
+	.shell.dark .empty {
+		border-color: var(--line);
+	}
+	.shell.dark input[type='password']::-webkit-credentials-auto-fill-button {
+		filter: invert(0.7);
+	}
+
 	/* ===== Responsive ===== */
 	@media (max-width: 760px) {
 		.f-row {
@@ -1353,22 +1919,39 @@
 		.filter-bar {
 			grid-template-columns: 1fr;
 		}
-		.kpis {
-			grid-template-columns: 1fr 1fr;
-		}
 		.main {
-			padding: 1.1rem 1rem 3rem;
+			padding: 1rem 0.85rem 3rem;
 		}
-		.page-head {
-			flex-direction: column;
-			align-items: flex-start;
+		.item { padding: 0.7rem 0.75rem; gap: 0.6rem; }
+		.info strong { font-size: 12.5px; }
+	}
+	@media (max-width: 640px) {
+		.kpis {
+			display: flex;
+			flex-wrap: nowrap;
+			gap: 0.5rem;
+			overflow-x: auto;
+			padding-bottom: 0.2rem;
+			justify-content: flex-start;
+			scrollbar-width: none;
 		}
-		.item {
-			grid-template-columns: auto auto 1fr;
+		.kpis::-webkit-scrollbar { display: none; }
+		.kpi {
+			flex: 0 0 auto;
+			padding: 0.5rem 0.75rem 0.5rem 0.55rem;
+			gap: 0.5rem;
+			border-radius: 999px;
 		}
-		.item .actions {
-			grid-column: 3;
-			justify-content: flex-end;
-		}
+		.kpi-ic { width: 28px; height: 28px; border-radius: 50%; }
+		.kpi strong { font-size: 15px; display: inline; }
+		.kpi span { font-size: 10.5px; }
+		.kpi > div { display: inline-flex; align-items: baseline; gap: 0.3rem; }
+		.item { padding: 0.6rem 0.65rem; gap: 0.5rem; }
+		.li-avatar { width: 22px; height: 22px; font-size: 11px; }
+		.name-row { gap: 0.4em; }
+		.info strong { white-space: normal; line-height: 1.3; word-break: break-word; }
+		.link { font-size: 10.5px; }
+		.actions { gap: 0.3rem; }
+		.icon-btn { width: 30px; height: 30px; border-radius: 8px; }
 	}
 </style>

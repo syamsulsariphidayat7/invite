@@ -7,15 +7,15 @@ import sharp from 'sharp';
 export async function POST({ request, locals, url }) {
 	if (!locals.adminAuthed) error(401, 'Unauthorized');
 	const slug = url.searchParams.get('slug')?.trim().toLowerCase();
-	if (!slug) error(400, 'slug query required');
+	if (!slug) error(400, 'Undangan wajib.');
 
 	const supabaseUrl = env.SUPABASE_URL?.trim();
 	const serviceKey = (env.SUPABASE_SECRET_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY)?.trim();
-	if (!supabaseUrl || !serviceKey) error(500, 'Supabase Storage belum dikonfigurasi (SUPABASE_URL / SUPABASE_SECRET_KEY).');
+	if (!supabaseUrl || !serviceKey) error(500, 'Penyimpanan belum dikonfigurasi.');
 
 	const kind = (url.searchParams.get('kind') ?? 'gallery').toLowerCase();
-	const allowedKinds = new Set(['gallery', 'hero', 'bride', 'groom', 'cover', 'igfilter']);
-	if (!allowedKinds.has(kind)) error(400, 'kind harus gallery/hero/bride/groom/cover/igfilter');
+	const allowedKinds = new Set(['gallery', 'music']);
+	if (!allowedKinds.has(kind)) error(400, 'Jenis upload tidak valid.');
 	const form = await request.formData();
 	const files = form.getAll('files').filter((v): v is File => v instanceof File);
 	if (files.length === 0) {
@@ -29,20 +29,25 @@ export async function POST({ request, locals, url }) {
 	const uploaded: string[] = [];
 
 	for (const file of files) {
-		if (!file.type.startsWith('image/')) error(400, `File ${file.name} bukan gambar.`);
-		if (file.size > 8 * 1024 * 1024) error(400, `File ${file.name} > 8MB.`);
+		const isImage = file.type.startsWith('image/');
+		const isAudio = file.type.startsWith('audio/');
+		if (!isImage && !isAudio) error(400, `File ${file.name} bukan gambar atau audio.`);
+		if (file.size > 20 * 1024 * 1024) error(400, `File ${file.name} > 20MB.`);
 		const orig = new Uint8Array(await file.arrayBuffer());
 		let outBuf: Uint8Array = orig;
 		let contentType = file.type;
-		let ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg';
-		try {
-			const processed = await sharp(orig).rotate().resize(1600, 1600, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 82, mozjpeg: true }).toBuffer();
-			outBuf = new Uint8Array(processed);
-			contentType = 'image/jpeg';
-			ext = 'jpg';
-		} catch {}
+		let ext = file.name.split('.').pop()?.toLowerCase() ?? (isImage ? 'jpg' : 'mp3');
+		if (isImage && kind !== 'music') {
+			try {
+				const processed = await sharp(orig).rotate().resize(1600, 1600, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 82, mozjpeg: true }).toBuffer();
+				outBuf = new Uint8Array(processed);
+				contentType = 'image/jpeg';
+				ext = 'jpg';
+			} catch {}
+		}
+		const folder = kind === 'music' ? `${slug}/audio` : slug;
 		const safe = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-		const path = `${slug}/${safe}`;
+		const path = `${folder}/${safe}`;
 		const { error: upErr } = await supabase.storage.from('invitation-photos').upload(path, outBuf as never, {
 			contentType,
 			upsert: false
@@ -57,19 +62,14 @@ export async function POST({ request, locals, url }) {
 		const inv = await getInvitation(slug);
 		if (inv) {
 			const cur = inv.dataJson as Record<string, unknown>;
-			if (kind === 'gallery') {
+			if (kind === 'music') {
+				const url = uploaded[0] ?? '';
+				await updateInvitation(slug, { dataJson: { ...cur, music_url: url } });
+			} else {
 				const arr = Array.isArray(cur.gallery) ? (cur.gallery as string[]) : [];
 				const merged = [...arr, ...uploaded].slice(-120);
 				await updateInvitation(slug, { dataJson: { ...cur, gallery: merged } });
 				galleryUrls = merged;
-			} else if (kind === 'igfilter') {
-				await updateInvitation(slug, { dataJson: { ...cur, instagram_filter_url: uploaded[0] ?? '' } });
-				galleryUrls = uploaded;
-			} else {
-				const photos = (cur.photos as Record<string, string> | undefined) ?? {};
-				const nextPhotos = { ...photos, [kind]: uploaded[0] ?? '' };
-				await updateInvitation(slug, { dataJson: { ...cur, photos: nextPhotos } });
-				galleryUrls = uploaded;
 			}
 		}
 	} catch {}
@@ -79,18 +79,18 @@ export async function POST({ request, locals, url }) {
 export async function DELETE({ locals, url }) {
 	if (!locals.adminAuthed) error(401, 'Unauthorized');
 	const slug = url.searchParams.get('slug')?.trim().toLowerCase();
-	if (!slug) error(400, 'slug query required');
+	if (!slug) error(400, 'Undangan wajib.');
 	const delUrl = url.searchParams.get('url');
 	const reorder = url.searchParams.get('reorder');
 	const supabaseUrl = env.SUPABASE_URL?.trim();
 	const serviceKey = (env.SUPABASE_SECRET_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY)?.trim();
-	if (!supabaseUrl || !serviceKey) error(500, 'Supabase Storage belum dikonfigurasi.');
+	if (!supabaseUrl || !serviceKey) error(500, 'Penyimpanan belum dikonfigurasi.');
 	const supabase = createClient(supabaseUrl, serviceKey);
 
 	if (reorder) {
 		try {
 			const list = JSON.parse(reorder) as string[];
-			if (!Array.isArray(list)) error(400, 'reorder harus array URL.');
+			if (!Array.isArray(list)) error(400, 'Data tidak valid.');
 			const inv = await getInvitation(slug);
 			if (!inv) error(404, 'Undangan tidak ditemukan.');
 			await updateInvitation(slug, { dataJson: { ...(inv.dataJson as Record<string, unknown>), gallery: list } });
@@ -98,18 +98,26 @@ export async function DELETE({ locals, url }) {
 		} catch (e: unknown) {
 			const m = e instanceof Error ? e.message : String(e);
 			if (m.includes('Unauthorized') || m.includes('slug')) throw e;
-			error(400, 'Format reorder tidak valid.');
+			error(400, 'Data tidak valid.');
 		}
 	}
 
-	if (!delUrl) error(400, 'url atau reorder required');
+	if (!delUrl) error(400, 'Pilih foto yang akan dihapus.');
 	const inv = await getInvitation(slug);
 	if (!inv) error(404, 'Undangan tidak ditemukan.');
 	const cur = inv.dataJson as Record<string, unknown>;
 	const arr = Array.isArray(cur.gallery) ? (cur.gallery as string[]) : [];
 	const next = arr.filter((u) => u !== delUrl);
-	if (next.length !== arr.length) {
-		await updateInvitation(slug, { dataJson: { ...cur, gallery: next } });
+	const photos = (cur.photos as Record<string, string | null> | undefined) ?? {};
+	let nextPhotos: Record<string, string | null> | null = null;
+	for (const k of ['hero', 'bride', 'groom', 'cover'] as const) {
+		if (photos[k] === delUrl) {
+			if (!nextPhotos) nextPhotos = { ...photos };
+			nextPhotos[k] = null;
+		}
+	}
+	if (next.length !== arr.length || nextPhotos) {
+		await updateInvitation(slug, { dataJson: { ...cur, gallery: next, ...(nextPhotos ? { photos: nextPhotos } : {}) } });
 	}
 	try {
 		const marker = '/invitation-photos/';
@@ -119,5 +127,5 @@ export async function DELETE({ locals, url }) {
 			await supabase.storage.from('invitation-photos').remove([path]);
 		}
 	} catch {}
-	return json({ gallery: next });
+	return json({ gallery: next, photos: nextPhotos ?? photos });
 }

@@ -23,6 +23,7 @@
 		Link2,
 		Palette,
 		Search,
+		Send,
 		ChevronDown,
 		PanelLeftClose,
 		PanelLeftOpen,
@@ -73,10 +74,8 @@
 	let exportType = $state<'tamu' | 'ucapan'>('tamu');
 	let selGallery = $state<Set<string>>(new Set());
 	let picker = $state<HTMLInputElement | null>(null);
-	let pendingKind = $state<'gallery' | 'hero' | 'bride' | 'groom' | 'cover'>('gallery');
 	let pendingFiles = $state<File[]>([]);
 	let pendingPreviews = $state<string[]>([]);
-	let openSlot = $state<'gallery' | 'hero' | 'bride' | 'groom' | null>(null);
 
 	// Layout state
 	let sidebarOpen = $state(false);
@@ -135,6 +134,16 @@
 		})
 	);
 
+	function coverOf(it: InvitationItem): string | null {
+		const dj = (it.dataJson ?? {}) as Record<string, unknown>;
+		const ph = (dj.photos as Record<string, string> | undefined) ?? {};
+		if (ph.cover?.trim()) return ph.cover.trim();
+		if (ph.hero?.trim()) return ph.hero.trim();
+		const gal = Array.isArray(dj.gallery) ? (dj.gallery as string[]) : [];
+		if (gal.length > 0) return gal[0];
+		return null;
+	}
+
 	function toggleRail() {
 		sidebarCollapsed = !sidebarCollapsed;
 		try {
@@ -181,12 +190,7 @@
 			const saved = localStorage.getItem('admin_dark');
 			dark = saved ? saved === '1' : window.matchMedia('(prefers-color-scheme: dark)').matches;
 		} catch {}
-		load().then(() => {
-			if (!selected) {
-				const demo = items.find((x) => x.subdomain === 'demo');
-				if (demo) openDetail(demo.subdomain);
-			}
-		});
+		load();
 	});
 
 	function openCreate() {
@@ -246,7 +250,7 @@
 			} else {
 				const sd = formSubdomain.trim().toLowerCase();
 				if (!sd) {
-					formErr = 'Subdomain wajib.';
+					formErr = 'Link undangan wajib.';
 					return;
 				}
 				const res = await fetch('/api/admin/invitations', {
@@ -306,6 +310,22 @@
 		return `/${sd}`;
 	}
 
+	function kelolaUrl(): string {
+		return `${location.origin}/${selected}/kelola?pin=${encodeURIComponent(cur?.accessPin ?? '')}`;
+	}
+
+	function kirimLinkKelola() {
+		const nama = [cur?.namaPihak1, cur?.namaPihak2].filter(Boolean).join(' & ');
+		const url = kelolaUrl();
+		const pin = cur?.accessPin?.trim() ?? '';
+		const msg =
+			`Halo ${nama || 'konsumen'} 👋\n\n` +
+			`Berikut link untuk mengelola daftar tamu undangan Anda:\n${url}\n\n` +
+			(pin ? `PIN pengelola: ${pin}\n` : '') +
+			`Gunakan PIN di halaman kelola, dan jangan bagikan PIN ke tamu. Terima kasih 🙏`;
+		window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank', 'noopener');
+	}
+
 	function closeDetail() {
 		selected = null;
 		tab = 'overview';
@@ -324,18 +344,16 @@
 	let kontenThemePrimary = $state('#8b5e3c');
 	let kontenThemeSecondary = $state('#f5ebe0');
 	let kontenMusic = $state('');
+	let kontenMusicUploading = $state(false);
 	let kontenLivestream = $state('');
 	let kontenStoryIntro = $state('');
 	let kontenStoryChapters = $state<{ title: string; text: string }[]>([]);
 	let kontenGiftNote = $state('');
 	let kontenVenue = $state({ name: '', address: '', maps_url: '' });
 	let kontenSocial = $state({ whatsapp: '', instagram: '' });
-	let kontenIgFilter = $state('');
-	let kontenPick = $state<'cover' | 'igfilter' | null>(null);
 	let kontenWishes = $state({ minName: 2, minMessage: 2, note: '' });
 	let kontenMusicYt = $state('');
-	let kontenMusicStart = $state('');
-	let kontenPhotosCover = $state('');
+	let kontenMusicStart = $state<string | number | null>('');
 
 	let showForm = $state(false);
 	let editing = $state<string | null>(null);
@@ -375,10 +393,8 @@
 		kontenVenue = { name: vn?.name ?? '', address: vn?.address ?? '', maps_url: vn?.maps_url ?? vn?.mapsUrl ?? '' };
 		const sc = (dj.social as Record<string, string> | undefined) ?? null;
 		kontenSocial = { whatsapp: sc?.whatsapp ?? '', instagram: sc?.instagram ?? '' };
-		kontenIgFilter = (dj.instagram_filter_url as string) ?? (dj.instagramFilterUrl as string) ?? '';
 		const ws = (dj.wishes as Record<string, unknown> | undefined) ?? null;
 		kontenWishes = { minName: typeof ws?.minName === 'number' ? ws.minName : 2, minMessage: typeof ws?.minMessage === 'number' ? ws.minMessage : 2, note: typeof ws?.note === 'string' ? ws.note : '' };
-		kontenPhotosCover = (dj.photos as Record<string, string> | undefined)?.cover ?? '';
 		kontenLivestream = (dj.livestream_url as string) ?? '';
 		kontenStoryIntro = (dj.love_story_intro as string) ?? '';
 		const ls = Array.isArray(dj.love_story) ? (dj.love_story as { title: string; text: string }[]) : [];
@@ -431,7 +447,10 @@
 				verse: kontenVerseOff ? null : { arabic: kontenVerse.arabic, translation: kontenVerse.translation, source: kontenVerse.source },
 				music_url: kontenMusic.trim() || null,
 				music_youtube_id: kontenMusicYt.trim() || null,
-				music_start_seconds: kontenMusicStart.trim() ? Number(kontenMusicStart) : null,
+				music_start_seconds:
+					kontenMusicStart === '' || kontenMusicStart == null || Number.isNaN(Number(kontenMusicStart))
+						? null
+						: Number(kontenMusicStart),
 				gift_note: kontenGiftNote.trim() || null,
 				venue:
 					kontenVenue.name.trim() || kontenVenue.address.trim() || kontenVenue.maps_url.trim()
@@ -441,15 +460,10 @@
 					kontenSocial.whatsapp.trim() || kontenSocial.instagram.trim()
 						? { whatsapp: kontenSocial.whatsapp.trim(), instagram: kontenSocial.instagram.trim() }
 						: null,
-				instagram_filter_url: kontenIgFilter.trim() || null,
 				wishes: {
 					minName: kontenWishes.minName,
 					minMessage: kontenWishes.minMessage,
 					note: kontenWishes.note.trim()
-				},
-				photos: {
-					...(typeof curD.photos === 'object' && curD.photos ? (curD.photos as Record<string, unknown>) : {}),
-					cover: kontenPhotosCover.trim() || null
 				},
 				livestream_url: kontenLivestream.trim() || null,
 				love_story: kontenStoryChapters.filter((c) => c.title.trim() || c.text.trim()),
@@ -490,10 +504,45 @@
 		const dj = (it?.dataJson ?? {}) as Record<string, unknown>;
 		return Array.isArray(dj.gallery) ? (dj.gallery as string[]) : [];
 	}
-	function currentPhoto(kind: 'hero' | 'bride' | 'groom' | 'cover'): string {
+	function currentPhotos(): Record<string, string> {
 		const dj = (cur?.dataJson ?? {}) as Record<string, unknown>;
-		const ph = (dj.photos as Record<string, string> | undefined) ?? {};
-		return ph[kind] ?? '';
+		return (dj.photos as Record<string, string> | undefined) ?? {};
+	}
+	function rolesOf(url: string): string[] {
+		const ph = currentPhotos();
+		const roles: string[] = [];
+		if (ph.hero === url) roles.push('Hero');
+		if (ph.bride === url) roles.push('Bride');
+		if (ph.groom === url) roles.push('Groom');
+		if (ph.cover === url) roles.push('Sampul');
+		return roles;
+	}
+	async function assignPhoto(kind: 'hero' | 'bride' | 'groom' | 'cover', url: string) {
+		if (!selected) return;
+		uploadBusy = true;
+		uploadMsg = '';
+		try {
+			const it = items.find((x) => x.subdomain === selected);
+			const dj = (it?.dataJson ?? {}) as Record<string, unknown>;
+			const res = await fetch(`/api/admin/invitations?subdomain=${encodeURIComponent(selected)}`, {
+				method: 'PATCH',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ dataJson: { ...dj, photos: { ...currentPhotos(), [kind]: url } } })
+			});
+			const j = await res.json().catch(() => null);
+			if (!res.ok) {
+				uploadMsg = j?.message ?? 'Gagal mengatur foto.';
+				notify(uploadMsg, 'err');
+				return;
+			}
+			if (it && j?.item) it.dataJson = j.item.dataJson;
+			uploadMsg = `Dijadikan ${kind === 'cover' ? 'sampul' : kind}.`;
+			notify(uploadMsg);
+		} catch {
+			notify('Gagal mengatur foto.', 'err');
+		} finally {
+			uploadBusy = false;
+		}
 	}
 	async function deleteGalleryUrl(url: string) {
 		if (!selected) return;
@@ -502,7 +551,12 @@
 		const j = await res.json().catch(() => null);
 		if (!res.ok) { uploadMsg = j?.message ?? 'Gagal menghapus.'; notify(uploadMsg, 'err'); return; }
 		const it = items.find((x) => x.subdomain === selected);
-		if (it) it.dataJson = { ...(it.dataJson ?? {}), gallery: j.gallery ?? currentGallery().filter((u) => u !== url) };
+		if (it) {
+			const dj = (it.dataJson ?? {}) as Record<string, unknown>;
+			const curPh = (dj.photos as Record<string, string | null> | undefined) ?? {};
+			const nextPh = (j.photos as Record<string, string | null> | undefined) ?? curPh;
+			it.dataJson = { ...dj, gallery: j.gallery ?? currentGallery().filter((u) => u !== url), photos: nextPh };
+		}
 		const n = new Set(selGallery);
 		n.delete(url);
 		selGallery = n;
@@ -528,16 +582,21 @@
 		uploadMsg = '';
 		try {
 			let last: string[] | null = null;
+			let lastPhotos: Record<string, string | null> | null = null;
 			let okCount = 0;
 			for (const u of selGallery) {
 				const res = await fetch(`/api/admin/upload?slug=${encodeURIComponent(selected)}&url=${encodeURIComponent(u)}`, { method: 'DELETE' });
 				const j = await res.json().catch(() => null);
 				if (!res.ok) { notify(j?.message ?? 'Gagal menghapus sebagian.', 'err'); continue; }
 				last = j?.gallery ?? last;
+				if (j?.photos) lastPhotos = j.photos;
 				okCount++;
 			}
 			const it = items.find((x) => x.subdomain === selected);
-			if (it) it.dataJson = { ...(it.dataJson ?? {}), gallery: last ?? currentGallery().filter((u) => !selGallery.has(u)) };
+			if (it) {
+				const dj = (it.dataJson ?? {}) as Record<string, unknown>;
+				it.dataJson = { ...dj, gallery: last ?? currentGallery().filter((u) => !selGallery.has(u)), ...(lastPhotos ? { photos: lastPhotos } : {}) };
+			}
 			if (okCount > 0) {
 				uploadMsg = `${okCount} foto dihapus.`;
 				notify(`${okCount} foto dihapus.`);
@@ -562,10 +621,9 @@
 		if (it) it.dataJson = { ...(it.dataJson ?? {}), gallery: rj.gallery ?? arr };
 	}
 
-	function startPick(kind: 'gallery' | 'hero' | 'bride' | 'groom' | 'cover') {
-		pendingKind = kind;
+	function startPick() {
 		if (picker) {
-			picker.multiple = kind === 'gallery';
+			picker.multiple = true;
 			picker.accept = 'image/*';
 			picker.value = '';
 			picker.click();
@@ -574,59 +632,8 @@
 	function onPickChange() {
 		if (!picker?.files?.length) return;
 		const files = Array.from(picker.files);
-		if (kontenPick) {
-			doKontenUpload(kontenPick, files);
-			return;
-		}
 		pendingFiles = files;
 		pendingPreviews = files.map((f) => URL.createObjectURL(f));
-	}
-	function kontenUpload(field: 'cover' | 'igfilter') {
-		kontenPick = field;
-		if (picker) {
-			picker.multiple = false;
-			picker.accept = 'image/*';
-			picker.value = '';
-			picker.click();
-		}
-	}
-	async function doKontenUpload(field: 'cover' | 'igfilter', files: File[]) {
-		if (!selected || files.length === 0) {
-			kontenPick = null;
-			return;
-		}
-		uploadBusy = true;
-		uploadMsg = '';
-		try {
-			const fd = new FormData();
-			for (const f of files) fd.append('files', f);
-			const res = await fetch(`/api/admin/upload?slug=${encodeURIComponent(selected)}&kind=${encodeURIComponent(field)}`, { method: 'POST', body: fd });
-			const j = await res.json().catch(() => null);
-			if (!res.ok) {
-				notify(j?.message ?? 'Upload gagal.', 'err');
-				return;
-			}
-			const url = (j.urls ?? [])[0];
-			if (!url) return;
-			if (field === 'igfilter') {
-				kontenIgFilter = url;
-				notify('Filter terupload — klik Simpan Konten.');
-			} else {
-				kontenPhotosCover = url;
-				notify('Cover terupload — klik Simpan Konten.');
-			}
-			const it = items.find((x) => x.subdomain === selected);
-			if (it) {
-				const dj = (it.dataJson ?? {}) as Record<string, unknown>;
-				if (field === 'igfilter') it.dataJson = { ...dj, instagram_filter_url: url };
-				else it.dataJson = { ...dj, photos: { ...((dj.photos as Record<string, string> | undefined) ?? {}), cover: url } };
-			}
-		} catch {
-			notify('Gagal upload.', 'err');
-		} finally {
-			uploadBusy = false;
-			kontenPick = null;
-		}
 	}
 	function clearPending() {
 		pendingPreviews.forEach((u) => URL.revokeObjectURL(u));
@@ -640,7 +647,7 @@
 		try {
 			const fd = new FormData();
 			for (const f of pendingFiles) fd.append('files', f);
-			const res = await fetch(`/api/admin/upload?slug=${encodeURIComponent(selected)}&kind=${encodeURIComponent(pendingKind)}`, { method: 'POST', body: fd });
+			const res = await fetch(`/api/admin/upload?slug=${encodeURIComponent(selected)}`, { method: 'POST', body: fd });
 			const j = await res.json().catch(() => null);
 			if (!res.ok) {
 				uploadMsg = j?.message ?? 'Upload gagal.';
@@ -648,17 +655,12 @@
 				return;
 			}
 			const urls: string[] = j.urls ?? [];
-			uploadMsg = `${urls.length} foto terupload.`;
+			uploadMsg = `${urls.length} foto terupload — pilih perannya di bawah.`;
 			notify(`${urls.length} foto terupload.`);
 			const it = items.find((x) => x.subdomain === selected);
-			if (it) {
+			if (it && j.gallery) {
 				const dj = (it.dataJson ?? {}) as Record<string, unknown>;
-				if (pendingKind === 'gallery') {
-					if (j.gallery) it.dataJson = { ...dj, gallery: j.gallery };
-				} else if (urls[0]) {
-					const ph = (dj.photos as Record<string, string> | undefined) ?? {};
-					it.dataJson = { ...dj, photos: { ...ph, [pendingKind]: urls[0] } };
-				}
+				it.dataJson = { ...dj, gallery: j.gallery };
 			}
 			selGallery = new Set();
 			clearPending();
@@ -726,10 +728,11 @@
 			</div>
 		</div>
 		<div class="topbar-right">
+			<a class="btn btn-ghost sm top-site" href="/demo" target="_blank" rel="noopener" title="Lihat demo undangan"><ExternalLink size={15} /> <span>Demo</span></a>
+			<button class="btn btn-primary sm top-create" onclick={openCreate}><Plus size={15} /> <span>Buat Undangan</span></button>
 			<button class="btn btn-ghost sm theme-btn" onclick={toggleDark} title={dark ? 'Mode terang' : 'Mode gelap'} aria-label="Ganti tema">
 				{#if dark}<Sun size={15} />{:else}<Moon size={15} />{/if}
 			</button>
-			<button class="btn btn-primary sm top-create" onclick={openCreate}><Plus size={15} /> Buat Undangan</button>
 			<div class="um-wrap">
 				<button class="user-chip" onclick={() => (userMenu = !userMenu)} aria-haspopup="true" aria-expanded={userMenu}>
 					<div class="avatar">AD</div>
@@ -748,8 +751,6 @@
 								<span>Panel Admin Undangan</span>
 							</div>
 						</div>
-						<button class="um-item" onclick={() => { window.open('/', '_blank'); userMenu = false; }}><ExternalLink size={14} /> Lihat Situs Undangan</button>
-						<div class="um-sep"></div>
 						<button class="um-item danger" onclick={logout}><LogOut size={14} /> Keluar</button>
 					</div>
 				{/if}
@@ -813,9 +814,8 @@
 				<header class="page-head">
 					<div>
 						<h1>Daftar Undangan</h1>
-						<p>Kelola subdomain, status, PIN kelola tamu, foto, dan konten setiap undangan.</p>
+						<p>Kelola undangan, status, PIN tamu, foto, dan konten setiap undangan.</p>
 					</div>
-					<button class="btn btn-primary" onclick={openCreate}><Plus size={16} /> Buat Undangan</button>
 				</header>
 
 				{#if loading}
@@ -855,14 +855,14 @@
 					{:else if items.length === 0}
 						<div class="empty">
 							<strong>Belum ada undangan</strong>
-							<p>Buat undangan pertama dengan subdomain mis. <code>ruhaeni-roni</code>.</p>
+							<p>Buat undangan pertama dengan link mis. <code>budi-ani</code>.</p>
 							<button class="btn btn-primary sm" onclick={openCreate}><Plus size={14} /> Buat Undangan</button>
 						</div>
 					{:else}
 						<div class="toolbar">
 							<div class="search-box">
 								<Search size={14} class="s-ic" />
-								<input type="text" placeholder="Cari subdomain atau nama pasangan…" bind:value={searchQ} />
+								<input type="text" placeholder="Cari link atau nama pasangan…" bind:value={searchQ} />
 								{#if searchQ}<button class="s-clear" onclick={() => (searchQ = '')} aria-label="Bersihkan pencarian"><X size={13} /></button>{/if}
 							</div>
 							<div class="chips">
@@ -880,52 +880,31 @@
 								<button class="btn btn-ghost sm" onclick={() => { searchQ = ''; statusF = 'all'; }}><X size={14} /> Reset Filter</button>
 							</div>
 						{:else}
-							<div class="card table-wrap">
-								<table>
-									<thead>
-										<tr>
-											<th>Subdomain / Link</th>
-											<th>Pasangan</th>
-											<th>Tanggal Acara</th>
-											<th>Status</th>
-											<th>PIN Kelola</th>
-											<th class="ta-r">Aksi</th>
-										</tr>
-									</thead>
-									<tbody>
-										{#each filteredItems as it}
-											<tr class:selected={selected === it.subdomain}>
-												<td>
-													<button class="lnk strong" onclick={() => openDetail(it.subdomain)}><code>{it.subdomain}</code></button>
-												</td>
-												<td>
-													<div class="couple">
-														<span>{it.namaPihak1 || '—'} <i>&</i> {it.namaPihak2 || '—'}</span>
-														<span class="tag" title={templateMeta.find((t) => t.id === it.template)?.description}>{templateLabel(it.template)}</span>
-													</div>
-												</td>
-												<td>{formatDate(it.tanggalAcara)}</td>
-												<td>
-													<span class="pill" class:ok={it.status === 'active'} class:warn={it.status === 'draft'} class:muted-pill={it.status === 'expired'}>
-														<span class="dot"></span>{it.status}
-													</span>
-												</td>
-												<td><code class="pin">{it.accessPin ?? '—'}</code></td>
-												<td class="ta-r">
-													<div class="actions">
-														<button class="btn-action" onclick={() => openDetail(it.subdomain)} title="Buka detail undangan (ringkasan, tamu, ucapan)"><LayoutDashboard size={13} /> <span>Buka</span></button>
-														<a class="btn-action" href={previewUrl(it.subdomain)} target="_blank" rel="noopener" title="Buka undangan publik di tab baru"><ExternalLink size={13} /> <span>Lihat</span></a>
-														<button class="btn-action" onclick={() => copy(`${location.origin}/${it.subdomain}`, it.subdomain)} title="Salin link undangan">
-															{#if copied === it.subdomain}<Check size={13} /> <span>Tersalin</span>{:else}<Copy size={13} /> <span>Salin Link</span>{/if}
-														</button>
-														<button class="btn-action" onclick={() => openEdit(it)} title="Edit subdomain, status, template, PIN"><Edit3 size={13} /> <span>Edit</span></button>
-														<button class="btn-action danger" onclick={() => del(it.subdomain)} title="Hapus undangan beserta tamu & ucapan"><Trash2 size={13} /> <span>Hapus</span></button>
-													</div>
-												</td>
-											</tr>
-										{/each}
-									</tbody>
-								</table>
+							<div class="inv-grid">
+								{#each filteredItems as it}
+									{@const cover = coverOf(it)}
+									<div class="inv-card" class:selected={selected === it.subdomain} role="button" tabindex="0" onclick={() => openDetail(it.subdomain)} onkeydown={(e) => e.key === 'Enter' && openDetail(it.subdomain)} aria-label={`Buka ${it.subdomain}`}>
+										<div class="inv-cover">
+											{#if cover}
+												<img src={cover} alt={`Sampul ${it.subdomain}`} loading="lazy" />
+											{:else}
+												<div class="inv-cover-empty">{initials(it.namaPihak1, it.namaPihak2)}</div>
+											{/if}
+											<span class="pill inv-status" class:ok={it.status === 'active'} class:warn={it.status === 'draft'} class:muted-pill={it.status === 'expired'}><span class="dot"></span>{it.status}</span>
+										</div>
+										<div class="inv-body">
+											<strong class="inv-name">{it.namaPihak1 || '—'} <i>&</i> {it.namaPihak2 || '—'}</strong>
+											<span class="inv-sub"><code>{it.subdomain}</code> · <span class="tag">{templateLabel(it.template)}</span></span>
+											<span class="inv-meta">{formatDate(it.tanggalAcara)} · PIN <code class="pin">{it.accessPin ?? '—'}</code></span>
+										</div>
+										<div class="inv-actions" role="group" aria-label="Aksi">
+											<a class="btn-action" href={previewUrl(it.subdomain)} target="_blank" rel="noopener" onclick={(e) => e.stopPropagation()} title="Lihat undangan"><ExternalLink size={13} /></a>
+											<button class="btn-action" onclick={(e) => { e.stopPropagation(); copy(`${location.origin}/${it.subdomain}`, it.subdomain); }} title="Salin link">{#if copied === it.subdomain}<Check size={13} />{:else}<Copy size={13} />{/if}</button>
+											<button class="btn-action" onclick={(e) => { e.stopPropagation(); openEdit(it); }} title="Edit"><Edit3 size={13} /></button>
+											<button class="btn-action danger" onclick={(e) => { e.stopPropagation(); del(it.subdomain); }} title="Hapus"><Trash2 size={13} /></button>
+										</div>
+									</div>
+								{/each}
 							</div>
 						{/if}
 					{/if}
@@ -950,6 +929,7 @@
 						<button class="btn btn-ghost" onclick={() => cur && openEdit(cur)}><Edit3 size={14} /> Pengaturan</button>
 						<a class="btn btn-ghost" href={previewUrl(selected)} target="_blank" rel="noopener"><ExternalLink size={14} /> Lihat</a>
 						<a class="btn btn-ghost" href={`/${selected}/kelola?pin=${encodeURIComponent(cur?.accessPin ?? '')}`} target="_blank" rel="noopener"><Users size={14} /> Kelola Tamu</a>
+						<button class="btn btn-ghost" onclick={kirimLinkKelola} title="Buka WhatsApp dengan pesan berisi link kelola tamu untuk konsumen"><Send size={14} /> Kirim Link Kelola</button>
 						<button class="icon-btn sm danger" onclick={() => del(selected!)} title="Hapus undangan"><Trash2 size={15} /></button>
 					</div>
 				</header>
@@ -1024,105 +1004,91 @@
 					</div>
 				{:else if tab === 'foto'}
 					<div class="card pad upload">
-						<h3 class="sec-title">Upload Foto</h3>
-						<p class="hint">Foto disimpan di Supabase Storage <code>invitation-photos/{selected}/</code> (public, auto-kompresi 1600px JPEG).</p>
-					<div class="upload-row">
-						<button class="btn btn-ghost" class:active={openSlot === 'hero'} onclick={() => { openSlot = openSlot === 'hero' ? null : 'hero'; clearPending(); }}>Hero</button>
-						<button class="btn btn-ghost" class:active={openSlot === 'bride'} onclick={() => { openSlot = openSlot === 'bride' ? null : 'bride'; clearPending(); }}>Bride</button>
-						<button class="btn btn-ghost" class:active={openSlot === 'groom'} onclick={() => { openSlot = openSlot === 'groom' ? null : 'groom'; clearPending(); }}>Groom</button>
-						<button class="btn btn-ghost" onclick={() => { openSlot = null; clearPending(); }}><Upload size={15} /> Galeri (max 12)</button>
-					</div>
-
-					<div class="slot-box">
-						<div class="slot-head"><h3 class="sec-title sub">Galeri — pratinjau <span class="count-pill">{currentGallery().length}</span></h3></div>
-						{#if pendingKind === 'gallery' && pendingFiles.length > 0}
-							<div class="pv-grid">
-								{#each pendingPreviews as pv, i}
-									<div class="pv-cell">
-										<img src={pv} alt={`Pratinjau ${i + 1}`} />
-										<button class="icon-btn sm danger pv-del" onclick={() => { pendingFiles = pendingFiles.filter((_, j) => j !== i); pendingPreviews = pendingPreviews.filter((_, j) => j !== i); }} title="Hapus dari pilihan"><Trash2 size={13} /></button>
+						<h3 class="sec-title">Foto — Galeri & Peran <span class="count-pill">{currentGallery().length}</span></h3>
+						<p class="hint">Satu pintu upload: semua foto masuk galeri. Hero / Bride / Groom / Sampul tinggal pilih dari galeri di bawah (boleh rangkap).</p>
+						{#if currentGallery().length > 0}
+							<div class="role-strip">
+								{#each [['hero','Hero'],['bride','Bride'],['groom','Groom'],['cover','Sampul']] as [k,label]}
+									{@const url = currentPhotos()[k]}
+									<div class="role-card">
+										<span class="role-label">{label}</span>
+										{#if url}<img src={url} alt={label} loading="lazy" />{:else}<div class="role-empty">Belum dipilih</div>{/if}
 									</div>
 								{/each}
 							</div>
-							<p class="hint">Foto baru ({pendingFiles.length}) — belum disimpan.</p>
-							<div class="slot-actions">
-								<button class="btn btn-primary sm" onclick={confirmUpload} disabled={uploadBusy}>{uploadBusy ? 'Mengupload…' : `Simpan ${pendingFiles.length} foto`}</button>
-								<button class="btn btn-ghost sm" onclick={clearPending} disabled={uploadBusy}>Batal</button>
-							</div>
-						{:else}
-							{#if currentGallery().length > 0}
-								<div class="bulk-bar">
-									<label class="bulk-check">
-										<input type="checkbox" checked={selGallery.size === currentGallery().length} onchange={selGallery.size === currentGallery().length ? clearGallerySel : selectAllGallery} />
-										Pilih semua ({currentGallery().length})
-									</label>
-									{#if selGallery.size > 0}
-										<span class="bulk-count">{selGallery.size} dipilih</span>
-										<button class="btn btn-primary sm" onclick={deleteSelectedGallery} disabled={uploadBusy}>Hapus Terpilih ({selGallery.size})</button>
-										<button class="btn btn-ghost sm" onclick={clearGallerySel}>Batal</button>
-									{/if}
-								</div>
-								<div class="gallery-grid">
-									{#each currentGallery() as url, i}
-										<div class="gcell" class:sel={selGallery.has(url)}>
-											<label class="gsel" title="Pilih untuk hapus massal"><input type="checkbox" checked={selGallery.has(url)} onchange={() => toggleGallerySel(url)} /></label>
-											<img src={url} alt={`Foto ${i + 1}`} loading="lazy" />
-											<div class="gact">
-												<button class="icon-btn sm" onclick={() => moveGallery(i, -1)} disabled={i === 0} title="Naik">↑</button>
-												<button class="icon-btn sm" onclick={() => moveGallery(i, 1)} disabled={i === currentGallery().length - 1} title="Turun">↓</button>
-												<button class="icon-btn sm danger" onclick={() => deleteGalleryUrl(url)} title="Hapus"><Trash2 size={12} /></button>
-											</div>
+						{/if}
+						<div class="dropzone" class:has-pending={pendingFiles.length > 0}>
+							{#if pendingFiles.length > 0}
+								<div class="pv-grid">
+									{#each pendingPreviews as pv, i}
+										<div class="pv-cell">
+											<img src={pv} alt={`Pratinjau ${i + 1}`} />
+											<button class="icon-btn sm danger pv-del" onclick={() => { URL.revokeObjectURL(pendingPreviews[i]); pendingFiles = pendingFiles.filter((_, j) => j !== i); pendingPreviews = pendingPreviews.filter((_, j) => j !== i); }} title="Hapus dari pilihan"><Trash2 size={13} /></button>
 										</div>
 									{/each}
 								</div>
-								<p class="hint">Galeri saat ini ({currentGallery().length} foto) — centang untuk hapus massal, ↑↓ untuk urut.</p>
-							{:else}
-								<div class="slot-empty">Belum ada foto galeri</div>
-							{/if}
-							<div class="slot-actions">
-								<button class="btn btn-ghost" onclick={() => startPick('gallery')} disabled={uploadBusy}><Upload size={14} /> Upload / Ganti</button>
-							</div>
-						{/if}
-					</div>
-
-					{#if openSlot && openSlot !== 'gallery'}
-						{@const k = openSlot}
-						{@const curUrl = currentPhoto(k)}
-						{@const staged = pendingKind === k && pendingFiles.length > 0 ? pendingPreviews[0] : null}
-						<div class="slot-box">
-							<div class="slot-head"><h3 class="sec-title sub">Foto {k}</h3></div>
-							<div class="slot-preview">
-								{#if staged}
-									<img src={staged} alt="Foto baru" />
-									<span class="slot-badge">Baru — belum disimpan</span>
-								{:else if curUrl}
-									<img src={curUrl} alt={`Foto ${k} saat ini`} />
-									<span class="slot-badge">Foto saat ini</span>
-								{:else}
-									<div class="slot-empty">Belum ada foto {k}</div>
-								{/if}
-							</div>
-							<div class="slot-actions">
-								{#if staged}
-									<button class="btn btn-primary sm" onclick={confirmUpload} disabled={uploadBusy}>{uploadBusy ? 'Mengupload…' : 'Simpan / Ganti'}</button>
+								<p class="hint">Foto baru ({pendingFiles.length}) — belum disimpan.</p>
+								<div class="slot-actions">
+									<button class="btn btn-primary sm" onclick={confirmUpload} disabled={uploadBusy}>{uploadBusy ? 'Mengupload…' : `Simpan ${pendingFiles.length} foto`}</button>
 									<button class="btn btn-ghost sm" onclick={clearPending} disabled={uploadBusy}>Batal</button>
-								{:else}
-									<button class="btn btn-ghost" onclick={() => startPick(k)} disabled={uploadBusy}><Upload size={14} /> Upload / Ganti</button>
+								</div>
+							{:else}
+								<button class="btn btn-ghost" onclick={startPick} disabled={uploadBusy}><Upload size={14} /> Pilih Foto (max 12)</button>
+								<span class="hint">JPG/PNG/WEBP, max 8MB per file, auto-kompresi 1600px</span>
+							{/if}
+						</div>
+						{#if pendingFiles.length === 0 && currentGallery().length > 0}
+							<div class="bulk-bar">
+								<label class="bulk-check">
+									<input type="checkbox" checked={selGallery.size === currentGallery().length && currentGallery().length > 0} onchange={selGallery.size === currentGallery().length ? clearGallerySel : selectAllGallery} />
+									Pilih semua ({currentGallery().length})
+								</label>
+								{#if selGallery.size > 0}
+									<span class="bulk-count">{selGallery.size} dipilih</span>
+									<button class="btn btn-primary sm" onclick={deleteSelectedGallery} disabled={uploadBusy}>Hapus Terpilih ({selGallery.size})</button>
+									<button class="btn btn-ghost sm" onclick={clearGallerySel}>Batal</button>
 								{/if}
 							</div>
-							<p class="hint">Klik <strong>Upload / Ganti</strong>, pilih foto — pratinjau muncul di sini dulu, lalu konfirmasi <strong>Simpan / Ganti</strong>.</p>
-						</div>
-					{/if}
-					{#if uploadMsg}<p class="hint ok">{uploadMsg}</p>{/if}
+							<div class="gallery-grid">
+								{#each currentGallery() as url, i}
+									{@const roles = rolesOf(url)}
+									<div class="gcell" class:sel={selGallery.has(url)}>
+										<label class="gsel" title="Pilih untuk hapus massal"><input type="checkbox" checked={selGallery.has(url)} onchange={() => toggleGallerySel(url)} /></label>
+										<div class="badges">
+											{#each roles as role}
+												<span class="role-badge">{role}</span>
+											{/each}
+											{#if roles.length === 0}
+												<span class="role-badge plain">Galeri</span>
+											{/if}
+										</div>
+										<img src={url} alt={`Foto ${i + 1}`} loading="lazy" />
+										<div class="role-actions">
+											{#each [['hero','Hero'],['bride','Bride'],['groom','Groom'],['cover','Sampul']] as [k,label]}
+												<button class="role-btn" class:active={currentPhotos()[k] === url} onclick={() => assignPhoto(k as 'hero'|'bride'|'groom'|'cover', url)} disabled={uploadBusy} title={currentPhotos()[k] === url ? `${label} ✓` : `Jadikan ${label}`}>{currentPhotos()[k] === url ? `✓ ${label}` : label}</button>
+											{/each}
+										</div>
+										<div class="gact">
+											<button class="icon-btn sm" onclick={() => moveGallery(i, -1)} disabled={i === 0} title="Naik">↑</button>
+											<button class="icon-btn sm" onclick={() => moveGallery(i, 1)} disabled={i === currentGallery().length - 1} title="Turun">↓</button>
+											<button class="icon-btn sm danger" onclick={() => deleteGalleryUrl(url)} title="Hapus"><Trash2 size={12} /></button>
+										</div>
+									</div>
+								{/each}
+							</div>
+							<p class="hint">Galeri ({currentGallery().length} foto) — centang untuk hapus massal, ↑↓ untuk urut, tombol per foto untuk jadikan Hero/Bride/Groom/Sampul (boleh rangkap).</p>
+						{:else if pendingFiles.length === 0}
+							<div class="slot-empty">Belum ada foto galeri — upload foto pertama di atas</div>
+						{/if}
+						{#if uploadMsg}<p class="hint ok">{uploadMsg}</p>{/if}
 					</div>
 					{:else if tab === 'konten'}
 					<div class="konten">
 						<div class="card pad konten-savebar">
 							<div>
 								<h3 class="sec-title">Konten Undangan</h3>
-								<p class="hint">Isi semua konten undangan di sini (events, mempelai, gifts, ayat, love story, sosial, tema & media). Klik <strong>Simpan Konten</strong> → tersimpan ke database dan langsung tampil di halaman <code>/{selected}</code>.</p>
+								<p class="hint">Isi semua konten undangan di sini (events, mempelai, gifts, ayat, love story, sosial, tema & media). Klik <strong>Simpan Konten</strong> di bawah → tersimpan ke database dan langsung tampil di halaman <code>/{selected}</code>.</p>
 							</div>
-							<button class="btn btn-primary" onclick={saveKonten} disabled={kontenSaving}>{kontenSaving ? 'Menyimpan…' : 'Simpan Konten'}</button>
 						</div>
 						{#if kontenMsg}<p class="hint" class:ok={kontenMsg === 'Tersimpan.'} class:err-text={kontenMsg !== 'Tersimpan.'}>{kontenMsg}</p>{/if}
 
@@ -1134,11 +1100,10 @@
 									<input type="date" bind:value={kontenEvents[i].date} />
 									<input placeholder="Jam (08.00 WIB)" bind:value={kontenEvents[i].time} />
 									<input placeholder="Lokasi" bind:value={kontenEvents[i].location} />
-									<input placeholder="Maps URL" bind:value={kontenEvents[i].map_url} />
-									<button class="icon-btn sm danger" onclick={() => (kontenEvents = kontenEvents.filter((_, j) => j !== i))}><Trash2 size={12} /></button>
+									<input placeholder="Maps URL" bind:value={kontenEvents[i].map_url} />										<button class="icon-btn sm danger" onclick={() => (kontenEvents = kontenEvents.filter((_, j) => j !== i))}><Trash2 size={12} /></button>
 								</div>
 							{/each}
-							<button class="btn btn-ghost sm" onclick={() => (kontenEvents = [...kontenEvents, { name: '', date: '', time: '', location: '', map_url: '' }])}><Plus size={12} /> Tambah Acara</button>
+							<button class="btn btn-primary sm" onclick={() => (kontenEvents = [...kontenEvents, { name: '', date: '', time: '', location: '', map_url: '' }])}><Plus size={12} /> Tambah Acara</button>
 						</section>
 
 						<section class="card pad k-sec">
@@ -1148,11 +1113,10 @@
 									<select bind:value={kontenGifts[i].type}><option value="bank">bank</option><option value="ewallet">ewallet</option></select>
 									<input placeholder="Provider (DANA/BCA)" bind:value={kontenGifts[i].provider} />
 									<input placeholder="Pemilik" bind:value={kontenGifts[i].owner} />
-									<input placeholder="No. rekening" bind:value={kontenGifts[i].number} />
-									<button class="icon-btn sm danger" onclick={() => (kontenGifts = kontenGifts.filter((_, j) => j !== i))}><Trash2 size={12} /></button>
+									<input placeholder="No. rekening" bind:value={kontenGifts[i].number} />										<button class="icon-btn sm danger" onclick={() => (kontenGifts = kontenGifts.filter((_, j) => j !== i))}><Trash2 size={12} /></button>
 								</div>
 							{/each}
-							<button class="btn btn-ghost sm" onclick={() => (kontenGifts = [...kontenGifts, { type: 'ewallet', provider: 'DANA', owner: '', number: '' }])}><Plus size={12} /> Tambah Gift</button>
+							<button class="btn btn-primary sm" onclick={() => (kontenGifts = [...kontenGifts, { type: 'ewallet', provider: 'DANA', owner: '', number: '' }])}><Plus size={12} /> Tambah Gift</button>
 							<h3 class="sec-title sub">Amplop Digital</h3>
 							<label><span>Catatan gift (opsional)</span><textarea rows="2" bind:value={kontenGiftNote}></textarea></label>
 						</section>
@@ -1186,55 +1150,44 @@
 							{#each kontenStoryChapters as ch, i}
 								<div class="konten-row">
 									<input placeholder="Judul" bind:value={kontenStoryChapters[i].title} />
-									<textarea placeholder="Teks" rows="2" bind:value={kontenStoryChapters[i].text}></textarea>
-									<button class="icon-btn sm danger" onclick={() => (kontenStoryChapters = kontenStoryChapters.filter((_, j) => j !== i))}><Trash2 size={12} /></button>
+									<textarea placeholder="Teks" rows="2" bind:value={kontenStoryChapters[i].text}></textarea>										<button class="icon-btn sm danger" onclick={() => (kontenStoryChapters = kontenStoryChapters.filter((_, j) => j !== i))}><Trash2 size={12} /></button>
 								</div>
 							{/each}
-							<button class="btn btn-ghost sm" onclick={() => (kontenStoryChapters = [...kontenStoryChapters, { title: '', text: '' }])}><Plus size={12} /> Tambah Bab</button>
+							<button class="btn btn-primary sm" onclick={() => (kontenStoryChapters = [...kontenStoryChapters, { title: '', text: '' }])}><Plus size={12} /> Tambah Bab</button>
 						</section>
 
 						<section class="card pad k-sec">
-							<h3 class="sec-title"><Link2 size={15} /> Sosial, Ucapan & Cover</h3>
+							<h3 class="sec-title"><Link2 size={15} /> Sosial & Ucapan</h3>
 							<div class="grid2"><label><span>WhatsApp footer</span><input placeholder="https://wa.me/62812..." bind:value={kontenSocial.whatsapp} /></label><label><span>Instagram footer</span><input placeholder="https://instagram.com/..." bind:value={kontenSocial.instagram} /></label></div>
-							<label><span>Instagram Filter (gambar)</span>
-								<div class="img-field">
-									{#if kontenIgFilter}<img class="img-thumb" src={kontenIgFilter} alt="Filter" loading="lazy" />{/if}
-									<div class="img-inputs">
-										<input placeholder="https://www.instagram.com/ar/... atau URL gambar" bind:value={kontenIgFilter} />
-										<div class="img-actions">
-											<button type="button" class="btn btn-ghost sm" onclick={() => kontenUpload('igfilter')} disabled={uploadBusy}><Upload size={13} /> Upload</button>
-											<select class="img-pick" aria-label="Pilih dari galeri" onchange={(e) => (kontenIgFilter = e.currentTarget.value)}>
-												<option value="">Pilih dari galeri…</option>
-												{#each currentGallery() as g, i}<option value={g}>Galeri — Foto {i + 1}</option>{/each}
-											</select>
-										</div>
-									</div>
-								</div>
-							</label>
 							<div class="grid2"><label><span>Min. nama (karakter)</span><input type="number" min="1" max="50" bind:value={kontenWishes.minName} /></label><label><span>Min. pesan (karakter)</span><input type="number" min="1" max="500" bind:value={kontenWishes.minMessage} /></label></div>
 							<label><span>Catatan ucapan</span><input placeholder="Khusus untuk tamu undangan" bind:value={kontenWishes.note} /></label>
-							<label><span>Foto cover sampul</span>
-								<div class="img-field">
-									{#if kontenPhotosCover}<img class="img-thumb" src={kontenPhotosCover} alt="Cover" loading="lazy" />{/if}
-									<div class="img-inputs">
-										<input placeholder="URL Supabase atau /photos/hero" bind:value={kontenPhotosCover} />
-										<div class="img-actions">
-											<button type="button" class="btn btn-ghost sm" onclick={() => kontenUpload('cover')} disabled={uploadBusy}><Upload size={13} /> Upload</button>
-											<select class="img-pick" aria-label="Pilih dari galeri" onchange={(e) => (kontenPhotosCover = e.currentTarget.value)}>
-												<option value="">Pilih dari galeri…</option>
-												{#each currentGallery() as g, i}<option value={g}>Galeri — Foto {i + 1}</option>{/each}
-											</select>
-										</div>
-									</div>
-								</div>
-							</label>
 						</section>
 
 						<section class="card pad k-sec">
 							<h3 class="sec-title"><Music size={15} /> Tema & Media</h3>
 							<div class="grid2"><label><span>Primary</span><input type="color" bind:value={kontenThemePrimary} /></label><label><span>Secondary</span><input type="color" bind:value={kontenThemeSecondary} /></label></div>
-							<label><span>Music URL</span><input placeholder="/audio/wedding.mp3 atau https://..." bind:value={kontenMusic} /></label>
-							<div class="grid2"><label><span>YouTube ID (fallback)</span><input placeholder="dQw4w9WgXcQ" bind:value={kontenMusicYt} /></label><label><span>Mulai detik ke-</span><input type="number" min="0" max="600" bind:value={kontenMusicStart} /></label></div>
+							<label>
+								<span>Music URL</span>
+								<div class="row">
+									<input placeholder="/audio/wedding.mp3 atau https://..." bind:value={kontenMusic} />
+									<button class="btn btn-primary sm" onclick={() => document.getElementById('music-upload')?.click()} disabled={kontenMusicUploading}><Upload size={14} /> {kontenMusicUploading ? 'Upload…' : 'Upload'}</button>
+								</div>
+								<input id="music-upload" type="file" accept="audio/*" hidden onchange={async (e) => {
+									const files = (e.target as HTMLInputElement).files;
+									if (!files?.length) return;
+									const fd = new FormData();
+									for (const f of files) fd.append('files', f);
+									kontenMusicUploading = true;
+									try {
+										const res = await fetch(`/api/admin/upload?slug=${encodeURIComponent(selected!)}&kind=music`, { method: 'POST', body: fd });
+										const j = await res.json().catch(() => null);
+										if (!res.ok) { notify(j?.message ?? 'Upload gagal.', 'err'); return; }
+										const url = (j.urls ?? [])[0];
+										if (url) { kontenMusic = url; notify('Musik terupload — klik Simpan Konten.'); }
+									} catch { notify('Gagal upload.', 'err'); } finally { kontenMusicUploading = false; (e.target as HTMLInputElement).value = ''; }
+								}} />
+							</label>
+							<div class="grid2"><label><span>YouTube (fallback)</span><input placeholder="dQw4w9WgXcQ atau https://youtu.be/..." bind:value={kontenMusicYt} /></label><label><span>Mulai detik ke-</span><input type="number" min="0" max="600" bind:value={kontenMusicStart} /></label></div>
 							<label><span>Livestream URL</span><input bind:value={kontenLivestream} /></label>
 						</section>
 
@@ -1253,8 +1206,8 @@
 			<form class="modal-card" onsubmit={submit}>
 				<h2>{editing ? `Edit ${editing}` : 'Buat Undangan Baru'}</h2>
 				<label>
-					<span>Subdomain *</span>
-					<input type="text" bind:value={formSubdomain} disabled={!!editing} placeholder="ruhaeni-roni" />
+				<span>Link Undangan *</span>
+				<input type="text" bind:value={formSubdomain} disabled={!!editing} placeholder="budi-ani" />
 				</label>
 				<div class="grid2">
 					<label><span>Pihak 1</span><input type="text" bind:value={formPihak1} placeholder="Ruhaeni" /></label>
@@ -1277,7 +1230,7 @@
 						{/each}
 					</select>
 				</label>
-				<label><span>PIN Kelola Tamu (6-digit, kosong = tanpa PIN / dev 000000)</span><input type="text" bind:value={formPin} placeholder="482913" /></label>
+				<label><span>PIN Kelola Tamu (6-digit, kosongkan jika tidak pakai PIN)</span><input type="text" bind:value={formPin} placeholder="482913" /></label>
 				{#if formErr}<p class="alert err">{formErr}</p>{/if}
 				<div class="modal-actions">
 					<button type="button" class="btn btn-ghost" onclick={() => (showForm = false)}>Batal</button>
@@ -1931,6 +1884,110 @@
 	.ta-r {
 		text-align: right;
 	}
+	.inv-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+		gap: 1rem;
+	}
+	.inv-card {
+		display: grid;
+		grid-template-rows: auto 1fr auto;
+		text-align: left;
+		border: 1px solid var(--line);
+		border-radius: var(--radius);
+		overflow: hidden;
+		background: var(--card);
+		box-shadow: var(--shadow);
+		cursor: pointer;
+		padding: 0;
+		font-family: inherit;
+		transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease;
+	}
+	.inv-card:hover {
+		transform: translateY(-2px);
+		box-shadow: var(--shadow-lg);
+		border-color: #d0d5dd;
+	}
+	.inv-card.selected {
+		border-color: var(--accent);
+		box-shadow: 0 0 0 3px var(--accent-soft);
+	}
+	.inv-cover {
+		position: relative;
+		aspect-ratio: 4 / 3;
+		background: var(--line-soft);
+		overflow: hidden;
+	}
+	.inv-cover img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+	}
+	.inv-cover-empty {
+		width: 100%;
+		height: 100%;
+		display: grid;
+		place-items: center;
+		font-size: 28px;
+		font-weight: 700;
+		color: #fff;
+		background: var(--accent);
+	}
+	.inv-status {
+		position: absolute;
+		top: 0.6rem;
+		left: 0.6rem;
+	}
+	.inv-body {
+		display: grid;
+		gap: 0.2rem;
+		padding: 0.85rem 0.9rem 0.6rem;
+	}
+	.inv-name {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.3em;
+		font-size: 13px;
+		font-weight: 700;
+		color: var(--ink);
+		text-align: center;
+	}
+	.inv-name i {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		font-style: normal;
+		font-weight: 400;
+		color: var(--ink-3);
+		line-height: 1;
+	}
+	.inv-sub {
+		font-size: 12px;
+		color: var(--ink-2);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.inv-sub code {
+		font-family: ui-monospace, monospace;
+		font-size: 11.5px;
+		background: var(--line-soft);
+		border-radius: 6px;
+		padding: 0.1em 0.4em;
+	}
+	.inv-meta {
+		font-size: 11.5px;
+		color: var(--ink-3);
+	}
+	.inv-actions {
+		display: flex;
+		gap: 0.35rem;
+		padding: 0.6rem 0.7rem;
+		border-top: 1px solid var(--line-soft);
+		background: #fafbff;
+	}
 	.lnk {
 		display: inline-flex;
 		align-items: center;
@@ -2104,6 +2161,7 @@
 		padding: 0.35em 0.8em;
 		font-size: 12px;
 	}
+
 	.icon-btn {
 		width: 34px;
 		height: 34px;
@@ -2166,14 +2224,23 @@
 		box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
 	}
 	.detail-head h1 {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.3em;
 		margin: 0;
 		font-size: 18px;
 		font-weight: 700;
+		flex-wrap: wrap;
 	}
 	.detail-head h1 i {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
 		font-style: normal;
+		font-weight: 400;
 		color: var(--ink-3);
-		padding: 0 0.2em;
+		line-height: 1;
 	}
 	.dh-sub {
 		display: flex;
@@ -2307,7 +2374,7 @@
 		color: var(--accent-strong);
 	}
 	.li-name {
-		font-size: 13.5px;
+		font-size: 12.5px;
 		color: var(--ink);
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -2344,49 +2411,55 @@
 		display: grid;
 		gap: 0.7rem;
 	}
-	.upload-row {
-		display: flex;
-		gap: 0.5rem;
-		flex-wrap: wrap;
-		align-items: center;
-	}
-	.upload-row .btn.active {
-		border-color: var(--accent);
-		color: var(--accent-strong);
-		background: var(--accent-soft);
-	}
-	.slot-box {
+	.role-strip {
 		display: grid;
-		gap: 0.7rem;
-		border: 1px solid var(--line);
-		border-radius: 12px;
-		padding: 1rem;
-		background: var(--bg);
+		grid-template-columns: repeat(4, 1fr);
+		gap: 0.6rem;
 	}
-	.slot-preview {
-		position: relative;
-		border-radius: 12px;
+	.role-card {
+		border: 1px solid var(--line);
+		border-radius: 10px;
 		overflow: hidden;
-		border: 1px solid var(--line);
-		background: #fff;
-		max-width: 280px;
+		background: var(--card);
+		text-align: center;
 	}
-	.slot-preview img {
+	.role-label {
+		display: block;
+		font-size: 11px;
+		font-weight: 700;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--ink-2);
+		padding: 0.4em 0;
+		background: var(--line-soft);
+		border-bottom: 1px solid var(--line);
+	}
+	.role-card img {
 		width: 100%;
-		aspect-ratio: 4 / 3;
+		aspect-ratio: 1;
 		object-fit: cover;
 		display: block;
 	}
-	.slot-badge {
-		position: absolute;
-		left: 8px;
-		bottom: 8px;
-		font-size: 11px;
-		font-weight: 600;
-		background: rgba(15, 23, 42, 0.75);
-		color: #fff;
-		border-radius: 999px;
-		padding: 0.2em 0.7em;
+	.role-empty {
+		aspect-ratio: 1;
+		display: grid;
+		place-items: center;
+		font-size: 12px;
+		color: var(--ink-3);
+	}
+	.dropzone {
+		display: grid;
+		place-items: center;
+		gap: 0.5rem;
+		padding: 1rem;
+		border: 1.5px dashed var(--line);
+		border-radius: 12px;
+		background: var(--line-soft);
+	}
+	.dropzone.has-pending {
+		place-items: stretch;
+		background: var(--card);
+		border-style: solid;
 	}
 	.slot-empty {
 		display: grid;
@@ -2492,6 +2565,54 @@
 		aspect-ratio: 1;
 		object-fit: cover;
 		display: block;
+	}
+	.badges {
+		position: absolute;
+		top: 6px;
+		right: 6px;
+		z-index: 2;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 0.2rem;
+	}
+	.role-badge {
+		font-size: 10px;
+		font-weight: 700;
+		color: #fff;
+		background: var(--accent);
+		border-radius: 999px;
+		padding: 0.15em 0.55em;
+	}
+	.role-badge.plain {
+		background: #64748b;
+	}
+	.role-actions {
+		display: flex;
+		gap: 0.3rem;
+		flex-wrap: wrap;
+		padding: 0.4rem;
+		justify-content: center;
+	}
+	.role-btn {
+		border: 1px solid var(--line);
+		background: var(--card);
+		color: var(--ink-2);
+		border-radius: 999px;
+		padding: 0.2em 0.6em;
+		font-size: 11px;
+		font-weight: 600;
+		font-family: inherit;
+		cursor: pointer;
+	}
+	.role-btn.active {
+		background: var(--accent);
+		color: #fff;
+		border-color: var(--accent);
+	}
+	.role-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 	.gact {
 		display: flex;
@@ -2946,6 +3067,7 @@
 		--danger-bg: #331118;
 		--shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.35);
 		--shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55);
+		color-scheme: dark;
 	}
 	.shell.dark th {
 		background: #16213a;
@@ -2953,12 +3075,18 @@
 	.shell.dark tbody tr:hover {
 		background: #1c2a44;
 	}
+	.shell.dark tr.selected {
+		background: #1e3a5f !important;
+	}
 	.shell.dark .chips button:hover,
 	.shell.dark .btn-ghost:hover,
-	.shell.dark .btn-action:hover {
+	.shell.dark .btn-action:hover,
+	.shell.dark .icon-btn:hover {
 		border-color: #475569;
 		background: #233047;
+		color: var(--ink);
 	}
+
 	.shell.dark .pill.ok {
 		border-color: #1c6b46;
 	}
@@ -2972,12 +3100,104 @@
 	}
 	.shell.dark .sk {
 		background: linear-gradient(90deg, #1c2740 25%, #243152 50%, #1c2740 75%);
+		background-size: 200% 100%;
 	}
 	.shell.dark .toast {
 		background: #0b1220;
 		box-shadow: var(--shadow-lg);
 	}
 	.shell.dark .modal {
-		box-shadow: var(--shadow-lg);
+		background: rgba(2, 6, 23, 0.72);
+	}
+	.shell.dark .side-overlay {
+		background: rgba(2, 6, 23, 0.62);
+	}
+	.shell.dark .list-item,
+	.shell.dark .wish-item,
+	.shell.dark .gcell,
+	.shell.dark .pv-cell,
+	.shell.dark .role-card,
+	.shell.dark .dropzone.has-pending,
+	.shell.dark .bulk-bar,
+	.shell.dark .slot-empty {
+		background: var(--card);
+		border-color: var(--line);
+	}
+	.shell.dark .list-item:hover,
+	.shell.dark .wish-item:hover {
+		border-color: #475569;
+	}
+	.shell.dark .gcell.sel {
+		border-color: var(--accent);
+	}
+	.shell.dark .konten label input,
+	.shell.dark .konten label textarea,
+	.shell.dark .konten label select,
+	.shell.dark .konten-row input,
+	.shell.dark .konten-row select,
+	.shell.dark .konten-row textarea,
+	.shell.dark .modal-card input,
+	.shell.dark .modal-card select,
+	.shell.dark .modal-card textarea,
+	.shell.dark .search-box input,
+	.shell.dark .img-pick,
+	.shell.dark .export-row select {
+		background: #0f1f39;
+		color: var(--ink);
+		border-color: var(--line);
+	}
+	.shell.dark .konten label input::placeholder,
+	.shell.dark .konten label textarea::placeholder,
+	.shell.dark .konten-row input::placeholder,
+	.shell.dark .search-box input::placeholder,
+	.shell.dark .modal-card input::placeholder {
+		color: var(--ink-3);
+	}
+	.shell.dark .konten-row,
+	.shell.dark .konten label span,
+	.shell.dark .modal-card label span {
+		border-color: var(--line);
+	}
+	.shell.dark .role-actions .role-btn {
+		background: #0f1f39;
+		border-color: var(--line);
+		color: var(--ink-2);
+	}
+	.shell.dark .role-actions .role-btn.active {
+		background: var(--accent);
+		color: #fff;
+		border-color: var(--accent);
+	}
+	.shell.dark .gact,
+	.shell.dark .role-strip .role-label {
+		border-color: var(--line);
+	}
+	.shell.dark input[type='date']::-webkit-calendar-picker-indicator {
+		filter: invert(0.7);
+	}
+	.shell.dark .empty {
+		background: var(--card);
+		border-color: var(--line);
+	}
+	.shell.dark .topbar,
+	.shell.dark .sidebar {
+		border-color: var(--line);
+	}
+	.shell.dark .crumb .crumb-cur,
+	.shell.dark .crumb-link {
+		color: var(--ink-2);
+	}
+	.shell.dark .inv-card {
+		border-color: var(--line);
+	}
+	.shell.dark .inv-card:hover {
+		border-color: #475569;
+	}
+	.shell.dark .inv-card.selected {
+		border-color: var(--accent);
+	}
+	.shell.dark .inv-actions {
+		background: #16213a;
+		border-color: var(--line);
 	}
 </style>

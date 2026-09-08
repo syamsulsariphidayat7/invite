@@ -7,13 +7,13 @@ export async function POST({ request, cookies, getClientAddress }) {
 	const rl = checkRateLimit(`admin-login:${ip}`, 5, 15 * 60_000);
 	if (!rl.allowed) error(429, `Terlalu banyak percobaan. Coba lagi ${rl.retryAfter} detik.`);
 	const expected = env.ADMIN_PIN?.trim();
-	if (!expected) error(500, 'ADMIN_PIN belum diset di env.');
+	if (!expected) error(500, 'PIN Admin belum dikonfigurasi.');
 
 	let body: unknown;
 	try {
 		body = await request.json();
 	} catch {
-		error(400, 'Body harus JSON.');
+		error(400, 'Data tidak valid.');
 	}
 	const { pin } = (body ?? {}) as { pin?: unknown };
 	if (typeof pin !== 'string' || !pin.trim()) error(400, 'PIN wajib diisi.');

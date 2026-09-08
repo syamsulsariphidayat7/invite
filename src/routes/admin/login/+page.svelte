@@ -41,9 +41,9 @@
 		<div class="card">
 			<Lock size={28} />
 			<h1>Admin Login</h1>
-			<p class="hint">Masukkan ADMIN_PIN dari env untuk mengelola undangan.</p>
+			<p class="hint">Masukkan PIN Admin untuk mengelola undangan.</p>
 			<form onsubmit={submit}>
-				<input type="password" placeholder="PIN admin" bind:value={pin} autocomplete="current-password" />
+				<input type="password" placeholder="PIN admin" bind:value={pin} autocomplete="current-password" autofocus />
 				{#if err}<p class="err">{err}</p>{/if}
 				<button type="submit" class="btn btn-green" disabled={busy}>
 					<LogIn size={16} />{busy ? 'Memeriksa…' : 'Masuk'}
