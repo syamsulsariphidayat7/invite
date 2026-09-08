@@ -516,12 +516,6 @@
 	function clearSelection() {
 		selectedIds = new Set();
 	}
-	function selectedLinksText(): string {
-		return guests
-			.filter((g) => selectedIds.has(g.id))
-			.map((g) => `${g.name}: ${linkFor(g.name)}`)
-			.join('\n');
-	}
 	function selectedWaText(): string {
 		return guests
 			.filter((g) => selectedIds.has(g.id))
@@ -529,10 +523,10 @@
 			.join('\n\n---\n\n');
 	}
 	async function copySelectedLinks() {
-		const txt = selectedLinksText();
+		const txt = selectedWaText();
 		if (!txt) return;
 		await copy(txt, 'bulk-links');
-		notify('Link terpilih disalin.');
+		notify('Teks undangan terpilih disalin.');
 	}
 	async function openSelectedWa() {
 		if (!hasLink) {
@@ -739,9 +733,9 @@
 								<button
 									class="icon-btn"
 									class:ok={copied === `copy-${g.id}`}
-									onclick={() => copy(linkFor(g.name), `copy-${g.id}`)}
-									aria-label="Salin link"
-									title="Salin Link"
+									onclick={() => copy(waMessageFor(g.name), `copy-${g.id}`)}
+									aria-label="Salin teks undangan"
+									title="Salin Teks"
 								>
 									{#if copied === `copy-${g.id}`}<Check size={15} />{:else}<Copy size={15} />{/if}
 								</button>

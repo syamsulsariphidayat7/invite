@@ -31,6 +31,7 @@ export function resolveWedding(dataJson: Record<string, unknown> | null | undefi
 	const musicDj = (dj.music as Record<string, unknown> | undefined) ?? null;
 	const rawMusicUrl = (dj.music_url as string | null | undefined) ?? (musicDj?.src as string | null | undefined) ?? null;
 	const rawYoutubeId = (dj.music_youtube_id as string | undefined) ?? (musicDj?.youtubeId as string | undefined) ?? null;
+	const rawMusicSource = (dj.music_source as string | undefined) ?? (musicDj?.source as string | undefined) ?? null;
 	const rawStartSeconds = (dj.music_start_seconds as number | string | undefined) ?? (musicDj?.startSeconds as number | string | undefined) ?? null;
 	const giftNoteRaw = (dj.gift_note as string | undefined) ?? ((dj.gift as Record<string, string> | undefined)?.note as string | undefined) ?? null;
 	const storyIntro = (dj.love_story_intro as string | undefined) ?? null;
@@ -128,17 +129,19 @@ export function resolveWedding(dataJson: Record<string, unknown> | null | undefi
 		if ((loc || murl) && !venueDj) venue = { name: loc ? loc.split(',')[0].slice(0, 80) : wedding.venue.name, address: loc ?? wedding.venue.address, mapsUrl: murl ?? wedding.venue.mapsUrl };
 	}
 
+	const musicSource = rawMusicSource === 'url' || rawMusicSource === 'youtube' ? rawMusicSource : (rawMusicUrl ? 'url' : (rawYoutubeId ? 'youtube' : 'url'));
 	const music =
-		rawMusicUrl !== null
+		rawMusicUrl !== null || rawYoutubeId !== null
 			? {
-					src: rawMusicUrl,
+					src: rawMusicUrl ?? '',
 					youtubeId: rawYoutubeId ?? '',
+					source: musicSource as 'url' | 'youtube',
 					startSeconds:
 						rawStartSeconds != null && Number.isFinite(Number(rawStartSeconds))
 							? Number(rawStartSeconds)
 							: wedding.music.startSeconds
 				}
-			: wedding.music;
+			: { ...wedding.music, source: (wedding.music as { source?: 'url' | 'youtube' }).source ?? musicSource };
 
 	let calendarUrlResolved = defaultCalendarUrl;
 	try {

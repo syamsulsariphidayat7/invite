@@ -7,35 +7,49 @@ export const musicState = writable<{ started: boolean; playing: boolean }>({
 });
 
 let overrideSrc: string | null = null;
+let overrideYtId: string | null = null;
 let overrideStartAt: number | null = null;
+let overrideSource: 'url' | 'youtube' | null = null;
 
-export function setMusicSrc(src: string | null, startSeconds?: number) {
-	overrideSrc = src?.trim() ? src.trim() : null;
-	if (typeof startSeconds === 'number') overrideStartAt = startSeconds;
+const defaultSrc = (wedding.music as { src?: string }).src || '';
+const defaultYtId = extractYoutubeId(wedding.music.youtubeId);
+const defaultStartAt = wedding.music.startSeconds || 0;
+const defaultSource: 'url' | 'youtube' = defaultSrc ? 'url' : (defaultYtId ? 'youtube' : 'url');
+
+export function setMusicConfig(config: {
+	src?: string | null;
+	youtubeId?: string | null;
+	startSeconds?: number;
+	source?: 'url' | 'youtube';
+}) {
+	if (config.src !== undefined) overrideSrc = config.src?.trim() || null;
+	if (config.youtubeId !== undefined) overrideYtId = config.youtubeId?.trim() || null;
+	if (typeof config.startSeconds === 'number') overrideStartAt = config.startSeconds;
+	if (config.source) overrideSource = config.source;
 	if (audio && overrideSrc !== null) {
 		try { audio.src = overrideSrc; audio.load(); } catch {}
 	}
 }
 
-const src = (wedding.music as { src?: string }).src || '';
-const ytId = extractYoutubeId(wedding.music.youtubeId);
-const startAt = wedding.music.startSeconds || 0;
+/** @deprecated Use setMusicConfig instead */
+export function setMusicSrc(src: string | null, startSeconds?: number) {
+	setMusicConfig({ src, startSeconds });
+}
 
-/** Ekstrak ID video dari ID mentah atau link YouTube lengkap. */
 function extractYoutubeId(input: string): string {
 	const trimmed = (input || '').trim();
 	if (!trimmed) return '';
-	// Sudah berupa ID mentah (11 karakter alfanumerik + -_)
 	if (/^[\w-]{11}$/.test(trimmed)) return trimmed;
-	// Link lengkap: youtu.be/..., youtube.com/watch?v=..., /shorts/, /embed/, /live/
 	const m = trimmed.match(
 		/(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/|live\/))([\w-]{11})/
 	);
 	return m ? m[1] : '';
 }
 
-function currentSrc(): string { return overrideSrc ?? src; }
-function currentStartAt(): number { return overrideStartAt ?? startAt; }
+function currentYtId(): string { return overrideYtId ?? defaultYtId; }
+function currentSrc(): string { return overrideSrc ?? defaultSrc; }
+function currentStartAt(): number { return overrideStartAt ?? defaultStartAt; }
+function currentSource(): 'url' | 'youtube' { return overrideSource ?? defaultSource; }
 
 let audio: HTMLAudioElement | null = null;
 let bootQueued = false;
@@ -99,6 +113,7 @@ async function bootYT() {
 	if (bootQueued) return;
 	bootQueued = true;
 	await loadApi();
+	const ytId = currentYtId();
 	if (!ytId) return;
 	const YT = window.YT as {
 		Player: new (el: string | HTMLElement, opts: Record<string, unknown>) => PlayerLike;
@@ -123,7 +138,7 @@ async function bootYT() {
 		},
 		events: {
 			onReady: (e: { target: PlayerLike }) => {
-				e.target.seekTo(startAt);
+				e.target.seekTo(currentStartAt());
 				e.target.playVideo();
 			},
 			onStateChange: (e: { data: number }) => {
@@ -135,9 +150,11 @@ async function bootYT() {
 
 export async function startMusic() {
 	if (typeof window === 'undefined') return;
-	const s = currentSrc();
+	const source = currentSource();
 	const st = currentStartAt();
-	if (s) {
+	if (source === 'url') {
+		const s = currentSrc();
+		if (!s) return;
 		const a = ensureAudio();
 		if (!a) return;
 		try {
@@ -148,6 +165,7 @@ export async function startMusic() {
 		} catch {}
 		return;
 	}
+	const ytId = currentYtId();
 	if (!ytId) return;
 	if (!bootQueued) await bootYT();
 	ytPlayer?.playVideo();
@@ -155,9 +173,11 @@ export async function startMusic() {
 
 export async function toggleMusic() {
 	if (typeof window === 'undefined') return;
-	const s = currentSrc();
+	const source = currentSource();
 	const st = currentStartAt();
-	if (s) {
+	if (source === 'url') {
+		const s = currentSrc();
+		if (!s) return;
 		const a = ensureAudio();
 		if (!a) return;
 		if (a.paused) {
@@ -170,6 +190,7 @@ export async function toggleMusic() {
 		}
 		return;
 	}
+	const ytId = currentYtId();
 	if (!ytId) return;
 	if (!bootQueued) {
 		await bootYT();

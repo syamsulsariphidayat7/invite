@@ -9,7 +9,7 @@
 	import { layouts } from '$lib/layouts/registry';
 	import { isKnownTemplate } from '$lib/layouts/meta';
 	import type { LayoutProps } from '$lib/layouts/types';
-	import { startMusic, setMusicSrc } from '$lib/music.svelte';
+	import { startMusic, setMusicConfig } from '$lib/music.svelte';
 	import type { ResolvedWedding } from '$lib/data/resolve';
 
 	let { data } = $props();
@@ -78,8 +78,8 @@
 		const th = r?._theme as { primary?: string | null; secondary?: string | null } | undefined;
 		if (th?.primary) document.documentElement.style.setProperty('--ink', th.primary);
 		if (th?.secondary) document.documentElement.style.setProperty('--paper', th.secondary);
-		const mu = (r?.music as { src?: string } | undefined)?.src;
-		if (mu !== undefined) setMusicSrc(mu ?? '', (r?.music as { startSeconds?: number } | undefined)?.startSeconds);
+		const mu = (r?.music as { src?: string; youtubeId?: string; source?: 'url' | 'youtube'; startSeconds?: number } | undefined);
+		if (mu !== undefined) setMusicConfig({ src: mu.src ?? '', youtubeId: mu.youtubeId, startSeconds: mu.startSeconds, source: mu.source });
 		if (page.url.searchParams.has('preview')) {
 			opened = true;
 			overlayVisible = false;

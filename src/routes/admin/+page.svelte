@@ -344,6 +344,7 @@
 	let kontenThemePrimary = $state('#8b5e3c');
 	let kontenThemeSecondary = $state('#f5ebe0');
 	let kontenMusic = $state('');
+	let kontenMusicSource = $state<'url' | 'youtube'>('url');
 	let kontenMusicUploading = $state(false);
 	let kontenLivestream = $state('');
 	let kontenStoryIntro = $state('');
@@ -385,6 +386,7 @@
 		kontenThemeSecondary = th.secondary ?? '#f5ebe0';
 		const mDj = (dj.music as Record<string, unknown> | undefined) ?? null;
 		kontenMusic = (dj.music_url as string) ?? (typeof mDj?.src === 'string' ? mDj.src : '');
+		kontenMusicSource = (dj.music_source as 'url' | 'youtube') ?? (typeof mDj?.source === 'string' ? (mDj.source as 'url' | 'youtube') : (kontenMusic ? 'url' : 'youtube'));
 		kontenMusicYt = (dj.music_youtube_id as string) ?? (typeof mDj?.youtubeId === 'string' ? mDj.youtubeId : '');
 		const musicStartRaw = (dj.music_start_seconds as number | string | undefined) ?? (typeof mDj?.startSeconds === 'number' ? mDj.startSeconds : null);
 		kontenMusicStart = musicStartRaw == null ? '' : String(musicStartRaw);
@@ -445,6 +447,7 @@
 				gifts: kontenGifts.filter((g) => g.number.trim()),
 				couple: { bride: { ...kontenBride }, groom: { ...kontenGroom } },
 				verse: kontenVerseOff ? null : { arabic: kontenVerse.arabic, translation: kontenVerse.translation, source: kontenVerse.source },
+				music_source: kontenMusicSource,
 				music_url: kontenMusic.trim() || null,
 				music_youtube_id: kontenMusicYt.trim() || null,
 				music_start_seconds:
@@ -1166,28 +1169,42 @@
 						<section class="card pad k-sec">
 							<h3 class="sec-title"><Music size={15} /> Tema & Media</h3>
 							<div class="grid2"><label><span>Primary</span><input type="color" bind:value={kontenThemePrimary} /></label><label><span>Secondary</span><input type="color" bind:value={kontenThemeSecondary} /></label></div>
-							<label>
-								<span>Music URL</span>
-								<div class="row">
-									<input placeholder="/audio/wedding.mp3 atau https://..." bind:value={kontenMusic} />
-									<button class="btn btn-primary sm" onclick={() => document.getElementById('music-upload')?.click()} disabled={kontenMusicUploading}><Upload size={14} /> {kontenMusicUploading ? 'Upload…' : 'Upload'}</button>
+							<label><span>Sumber Musik</span>
+								<div class="radio-group">
+									<label class="radio-label" class:active={kontenMusicSource === 'url'}>
+										<input type="radio" name="music-source" value="url" bind:group={kontenMusicSource} /> URL / Upload
+									</label>
+									<label class="radio-label" class:active={kontenMusicSource === 'youtube'}>
+										<input type="radio" name="music-source" value="youtube" bind:group={kontenMusicSource} /> YouTube
+									</label>
 								</div>
-								<input id="music-upload" type="file" accept="audio/*" hidden onchange={async (e) => {
-									const files = (e.target as HTMLInputElement).files;
-									if (!files?.length) return;
-									const fd = new FormData();
-									for (const f of files) fd.append('files', f);
-									kontenMusicUploading = true;
-									try {
-										const res = await fetch(`/api/admin/upload?slug=${encodeURIComponent(selected!)}&kind=music`, { method: 'POST', body: fd });
-										const j = await res.json().catch(() => null);
-										if (!res.ok) { notify(j?.message ?? 'Upload gagal.', 'err'); return; }
-										const url = (j.urls ?? [])[0];
-										if (url) { kontenMusic = url; notify('Musik terupload — klik Simpan Konten.'); }
-									} catch { notify('Gagal upload.', 'err'); } finally { kontenMusicUploading = false; (e.target as HTMLInputElement).value = ''; }
-								}} />
 							</label>
-							<div class="grid2"><label><span>YouTube (fallback)</span><input placeholder="dQw4w9WgXcQ atau https://youtu.be/..." bind:value={kontenMusicYt} /></label><label><span>Mulai detik ke-</span><input type="number" min="0" max="600" bind:value={kontenMusicStart} /></label></div>
+							{#if kontenMusicSource === 'url'}
+								<label>
+									<span>Music URL</span>
+									<div class="row">
+										<input placeholder="/audio/wedding.mp3 atau https://..." bind:value={kontenMusic} />
+										<button class="btn btn-primary sm" onclick={() => document.getElementById('music-upload')?.click()} disabled={kontenMusicUploading}><Upload size={14} /> {kontenMusicUploading ? 'Upload…' : 'Upload'}</button>
+									</div>
+									<input id="music-upload" type="file" accept="audio/*" hidden onchange={async (e) => {
+										const files = (e.target as HTMLInputElement).files;
+										if (!files?.length) return;
+										const fd = new FormData();
+										for (const f of files) fd.append('files', f);
+										kontenMusicUploading = true;
+										try {
+											const res = await fetch(`/api/admin/upload?slug=${encodeURIComponent(selected!)}&kind=music`, { method: 'POST', body: fd });
+											const j = await res.json().catch(() => null);
+											if (!res.ok) { notify(j?.message ?? 'Upload gagal.', 'err'); return; }
+											const url = (j.urls ?? [])[0];
+											if (url) { kontenMusic = url; notify('Musik terupload — klik Simpan Konten.'); }
+										} catch { notify('Gagal upload.', 'err'); } finally { kontenMusicUploading = false; (e.target as HTMLInputElement).value = ''; }
+									}} />
+								</label>
+							{:else}
+								<label><span>YouTube ID / Link</span><input placeholder="dQw4w9WgXcQ atau https://youtu.be/..." bind:value={kontenMusicYt} /></label>
+							{/if}
+							<label><span>Mulai detik ke-</span><input type="number" min="0" max="600" bind:value={kontenMusicStart} /></label>
 							<label><span>Livestream URL</span><input bind:value={kontenLivestream} /></label>
 						</section>
 
@@ -2740,6 +2757,28 @@
 			grid-template-columns: 1fr;
 		}
 	}
+
+	.radio-group {
+		display: flex;
+		gap: 0.5rem;
+		margin-top: 0.25rem;
+	}
+	.radio-label {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.5rem 1rem;
+		border: 1px solid var(--line);
+		border-radius: 8px;
+		cursor: pointer;
+		font-size: 13px;
+		transition: background 0.15s, border-color 0.15s;
+	}
+	.radio-label.active {
+		border-color: var(--accent);
+		background: var(--accent-soft);
+	}
+	.radio-label input { margin: 0; }
 
 	/* ===== Skeleton ===== */
 	.sk {
