@@ -14,8 +14,8 @@ export async function POST({ request, locals, url }) {
 	if (!supabaseUrl || !serviceKey) error(500, 'Supabase Storage belum dikonfigurasi (SUPABASE_URL / SUPABASE_SECRET_KEY).');
 
 	const kind = (url.searchParams.get('kind') ?? 'gallery').toLowerCase();
-	const allowedKinds = new Set(['gallery', 'hero', 'bride', 'groom', 'cover']);
-	if (!allowedKinds.has(kind)) error(400, 'kind harus gallery/hero/bride/groom/cover');
+	const allowedKinds = new Set(['gallery', 'hero', 'bride', 'groom', 'cover', 'igfilter']);
+	if (!allowedKinds.has(kind)) error(400, 'kind harus gallery/hero/bride/groom/cover/igfilter');
 	const form = await request.formData();
 	const files = form.getAll('files').filter((v): v is File => v instanceof File);
 	if (files.length === 0) {
@@ -62,6 +62,9 @@ export async function POST({ request, locals, url }) {
 				const merged = [...arr, ...uploaded].slice(-120);
 				await updateInvitation(slug, { dataJson: { ...cur, gallery: merged } });
 				galleryUrls = merged;
+			} else if (kind === 'igfilter') {
+				await updateInvitation(slug, { dataJson: { ...cur, instagram_filter_url: uploaded[0] ?? '' } });
+				galleryUrls = uploaded;
 			} else {
 				const photos = (cur.photos as Record<string, string> | undefined) ?? {};
 				const nextPhotos = { ...photos, [kind]: uploaded[0] ?? '' };

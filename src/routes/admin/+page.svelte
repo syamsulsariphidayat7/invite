@@ -26,7 +26,9 @@
 		ChevronDown,
 		PanelLeftClose,
 		PanelLeftOpen,
-		Download
+		Download,
+		Moon,
+		Sun
 	} from 'lucide-svelte';
 
 	interface InvitationItem {
@@ -74,7 +76,7 @@
 	let pendingKind = $state<'gallery' | 'hero' | 'bride' | 'groom' | 'cover'>('gallery');
 	let pendingFiles = $state<File[]>([]);
 	let pendingPreviews = $state<string[]>([]);
-	let openSlot = $state<'hero' | 'bride' | 'groom' | null>(null);
+	let openSlot = $state<'gallery' | 'hero' | 'bride' | 'groom' | null>(null);
 
 	// Layout state
 	let sidebarOpen = $state(false);
@@ -165,9 +167,19 @@
 		}
 	}
 
+	let dark = $state(false);
+	function toggleDark() {
+		dark = !dark;
+		try {
+			localStorage.setItem('admin_dark', dark ? '1' : '0');
+		} catch {}
+	}
+
 	onMount(() => {
 		try {
 			if (localStorage.getItem('admin_rail') === '1') sidebarCollapsed = true;
+			const saved = localStorage.getItem('admin_dark');
+			dark = saved ? saved === '1' : window.matchMedia('(prefers-color-scheme: dark)').matches;
 		} catch {}
 		load().then(() => {
 			if (!selected) {
@@ -319,6 +331,7 @@
 	let kontenVenue = $state({ name: '', address: '', maps_url: '' });
 	let kontenSocial = $state({ whatsapp: '', instagram: '' });
 	let kontenIgFilter = $state('');
+	let kontenPick = $state<'cover' | 'igfilter' | null>(null);
 	let kontenWishes = $state({ minName: 2, minMessage: 2, note: '' });
 	let kontenMusicYt = $state('');
 	let kontenMusicStart = $state('');
@@ -561,8 +574,59 @@
 	function onPickChange() {
 		if (!picker?.files?.length) return;
 		const files = Array.from(picker.files);
+		if (kontenPick) {
+			doKontenUpload(kontenPick, files);
+			return;
+		}
 		pendingFiles = files;
 		pendingPreviews = files.map((f) => URL.createObjectURL(f));
+	}
+	function kontenUpload(field: 'cover' | 'igfilter') {
+		kontenPick = field;
+		if (picker) {
+			picker.multiple = false;
+			picker.accept = 'image/*';
+			picker.value = '';
+			picker.click();
+		}
+	}
+	async function doKontenUpload(field: 'cover' | 'igfilter', files: File[]) {
+		if (!selected || files.length === 0) {
+			kontenPick = null;
+			return;
+		}
+		uploadBusy = true;
+		uploadMsg = '';
+		try {
+			const fd = new FormData();
+			for (const f of files) fd.append('files', f);
+			const res = await fetch(`/api/admin/upload?slug=${encodeURIComponent(selected)}&kind=${encodeURIComponent(field)}`, { method: 'POST', body: fd });
+			const j = await res.json().catch(() => null);
+			if (!res.ok) {
+				notify(j?.message ?? 'Upload gagal.', 'err');
+				return;
+			}
+			const url = (j.urls ?? [])[0];
+			if (!url) return;
+			if (field === 'igfilter') {
+				kontenIgFilter = url;
+				notify('Filter terupload — klik Simpan Konten.');
+			} else {
+				kontenPhotosCover = url;
+				notify('Cover terupload — klik Simpan Konten.');
+			}
+			const it = items.find((x) => x.subdomain === selected);
+			if (it) {
+				const dj = (it.dataJson ?? {}) as Record<string, unknown>;
+				if (field === 'igfilter') it.dataJson = { ...dj, instagram_filter_url: url };
+				else it.dataJson = { ...dj, photos: { ...((dj.photos as Record<string, string> | undefined) ?? {}), cover: url } };
+			}
+		} catch {
+			notify('Gagal upload.', 'err');
+		} finally {
+			uploadBusy = false;
+			kontenPick = null;
+		}
 	}
 	function clearPending() {
 		pendingPreviews.forEach((u) => URL.revokeObjectURL(u));
@@ -643,7 +707,7 @@
 
 <svelte:head><title>Panel Admin — Undangan</title></svelte:head>
 
-<div class="shell">
+<div class="shell" class:dark={dark}>
 	<header class="topbar">
 		<div class="topbar-left">
 			<button class="burger" onclick={() => (sidebarOpen = !sidebarOpen)} aria-label="Buka menu"><Menu size={20} /></button>
@@ -662,6 +726,9 @@
 			</div>
 		</div>
 		<div class="topbar-right">
+			<button class="btn btn-ghost sm theme-btn" onclick={toggleDark} title={dark ? 'Mode terang' : 'Mode gelap'} aria-label="Ganti tema">
+				{#if dark}<Sun size={15} />{:else}<Moon size={15} />{/if}
+			</button>
 			<button class="btn btn-primary sm top-create" onclick={openCreate}><Plus size={15} /> Buat Undangan</button>
 			<div class="um-wrap">
 				<button class="user-chip" onclick={() => (userMenu = !userMenu)} aria-haspopup="true" aria-expanded={userMenu}>
@@ -728,6 +795,7 @@
 		</aside>
 
 		<main class="main">
+			<input bind:this={picker} type="file" accept="image/*" hidden onchange={onPickChange} />
 			<nav class="crumb">
 				<span class="crumb-cur">Undangan</span>
 				{#if selected}
@@ -765,19 +833,19 @@
 				{:else}
 					<div class="kpis">
 						<div class="kpi">
-							<div class="kpi-ic" style="--c:#2563eb;--bg:#eff6ff"><FileText size={17} /></div>
+							<div class="kpi-ic" style="--c:var(--accent);--bg:var(--accent-soft)"><FileText size={17} /></div>
 							<div><strong>{counts.all}</strong><span>Total Undangan</span></div>
 						</div>
 						<div class="kpi">
-							<div class="kpi-ic" style="--c:#059669;--bg:#ecfdf5"><Check size={17} /></div>
+							<div class="kpi-ic" style="--c:var(--ok);--bg:var(--ok-bg)"><Check size={17} /></div>
 							<div><strong>{counts.active}</strong><span>Aktif</span></div>
 						</div>
 						<div class="kpi">
-							<div class="kpi-ic" style="--c:#d97706;--bg:#fffbeb"><Edit3 size={17} /></div>
+							<div class="kpi-ic" style="--c:var(--warn);--bg:var(--warn-bg)"><Edit3 size={17} /></div>
 							<div><strong>{counts.draft}</strong><span>Draft</span></div>
 						</div>
 						<div class="kpi">
-							<div class="kpi-ic" style="--c:#64748b;--bg:#f1f5f9"><Trash2 size={17} /></div>
+							<div class="kpi-ic" style="--c:var(--ink-3);--bg:var(--line-soft)"><Trash2 size={17} /></div>
 							<div><strong>{counts.expired}</strong><span>Nonaktif</span></div>
 						</div>
 					</div>
@@ -958,54 +1026,16 @@
 					<div class="card pad upload">
 						<h3 class="sec-title">Upload Foto</h3>
 						<p class="hint">Foto disimpan di Supabase Storage <code>invitation-photos/{selected}/</code> (public, auto-kompresi 1600px JPEG).</p>
-					<input bind:this={picker} type="file" accept="image/*" hidden onchange={onPickChange} />
 					<div class="upload-row">
-						<button class="btn btn-primary" onclick={() => startPick('gallery')} disabled={uploadBusy}><Upload size={15} /> Galeri (max 12)</button>
 						<button class="btn btn-ghost" class:active={openSlot === 'hero'} onclick={() => { openSlot = openSlot === 'hero' ? null : 'hero'; clearPending(); }}>Hero</button>
 						<button class="btn btn-ghost" class:active={openSlot === 'bride'} onclick={() => { openSlot = openSlot === 'bride' ? null : 'bride'; clearPending(); }}>Bride</button>
 						<button class="btn btn-ghost" class:active={openSlot === 'groom'} onclick={() => { openSlot = openSlot === 'groom' ? null : 'groom'; clearPending(); }}>Groom</button>
+						<button class="btn btn-ghost" onclick={() => { openSlot = null; clearPending(); }}><Upload size={15} /> Galeri (max 12)</button>
 					</div>
-					{#if openSlot}
-						{@const curUrl = currentPhoto(openSlot)}
-						{@const staged = pendingKind === openSlot && pendingFiles.length > 0 ? pendingPreviews[0] : null}
-						<div class="slot-box">
-							<div class="slot-head">
-								<h3 class="sec-title sub">Foto {openSlot}</h3>
-							</div>
-							<div class="slot-preview">
-								{#if staged}
-									<img src={staged} alt="Foto baru" />
-									<span class="slot-badge">Baru — belum disimpan</span>
-								{:else if curUrl}
-									<img src={curUrl} alt={`Foto ${openSlot} saat ini`} />
-									<span class="slot-badge">Foto saat ini</span>
-								{:else}
-									<div class="slot-empty">Belum ada foto {openSlot}</div>
-								{/if}
-							</div>
-							<div class="slot-actions">
-								{#if staged}
-									<button class="btn btn-primary sm" onclick={confirmUpload} disabled={uploadBusy}>{uploadBusy ? 'Mengupload…' : 'Simpan / Ganti'}</button>
-									<button class="btn btn-ghost sm" onclick={clearPending} disabled={uploadBusy}>Batal</button>
-								{:else}
-									<button class="btn btn-ghost" onclick={() => startPick(openSlot!)} disabled={uploadBusy}><Upload size={14} /> Upload / Ganti</button>
-								{/if}
-							</div>
-							<p class="hint">Klik <strong>Upload / Ganti</strong>, pilih foto — pratinjau muncul di sini dulu, lalu konfirmasi <strong>Simpan / Ganti</strong>.</p>
-						</div>
-					{/if}
-					{#if pendingKind === 'gallery' && pendingFiles.length > 0}
-						<div class="preview-box">
-							<div class="pv-head">
-								<h3 class="sec-title sub">Pratinjau — {pendingKind === 'gallery' ? 'Galeri' : pendingKind} ({pendingFiles.length})</h3>
-								<div class="pv-actions">
-									<button class="btn btn-ghost sm" onclick={clearPending} disabled={uploadBusy}>Batal</button>
-									<button class="btn btn-primary sm" onclick={confirmUpload} disabled={uploadBusy}>
-										<Upload size={14} />
-										{uploadBusy ? 'Mengupload…' : pendingKind === 'gallery' ? `Upload ${pendingFiles.length} foto` : `Ganti ${pendingKind}`}
-									</button>
-								</div>
-							</div>
+
+					<div class="slot-box">
+						<div class="slot-head"><h3 class="sec-title sub">Galeri — pratinjau <span class="count-pill">{currentGallery().length}</span></h3></div>
+						{#if pendingKind === 'gallery' && pendingFiles.length > 0}
 							<div class="pv-grid">
 								{#each pendingPreviews as pv, i}
 									<div class="pv-cell">
@@ -1014,41 +1044,78 @@
 									</div>
 								{/each}
 							</div>
-							<p class="hint">Periksa dulu — foto baru benar-benar diunggah setelah tombol Upload/Ganti ditekan.</p>
+							<p class="hint">Foto baru ({pendingFiles.length}) — belum disimpan.</p>
+							<div class="slot-actions">
+								<button class="btn btn-primary sm" onclick={confirmUpload} disabled={uploadBusy}>{uploadBusy ? 'Mengupload…' : `Simpan ${pendingFiles.length} foto`}</button>
+								<button class="btn btn-ghost sm" onclick={clearPending} disabled={uploadBusy}>Batal</button>
+							</div>
+						{:else}
+							{#if currentGallery().length > 0}
+								<div class="bulk-bar">
+									<label class="bulk-check">
+										<input type="checkbox" checked={selGallery.size === currentGallery().length} onchange={selGallery.size === currentGallery().length ? clearGallerySel : selectAllGallery} />
+										Pilih semua ({currentGallery().length})
+									</label>
+									{#if selGallery.size > 0}
+										<span class="bulk-count">{selGallery.size} dipilih</span>
+										<button class="btn btn-primary sm" onclick={deleteSelectedGallery} disabled={uploadBusy}>Hapus Terpilih ({selGallery.size})</button>
+										<button class="btn btn-ghost sm" onclick={clearGallerySel}>Batal</button>
+									{/if}
+								</div>
+								<div class="gallery-grid">
+									{#each currentGallery() as url, i}
+										<div class="gcell" class:sel={selGallery.has(url)}>
+											<label class="gsel" title="Pilih untuk hapus massal"><input type="checkbox" checked={selGallery.has(url)} onchange={() => toggleGallerySel(url)} /></label>
+											<img src={url} alt={`Foto ${i + 1}`} loading="lazy" />
+											<div class="gact">
+												<button class="icon-btn sm" onclick={() => moveGallery(i, -1)} disabled={i === 0} title="Naik">↑</button>
+												<button class="icon-btn sm" onclick={() => moveGallery(i, 1)} disabled={i === currentGallery().length - 1} title="Turun">↓</button>
+												<button class="icon-btn sm danger" onclick={() => deleteGalleryUrl(url)} title="Hapus"><Trash2 size={12} /></button>
+											</div>
+										</div>
+									{/each}
+								</div>
+								<p class="hint">Galeri saat ini ({currentGallery().length} foto) — centang untuk hapus massal, ↑↓ untuk urut.</p>
+							{:else}
+								<div class="slot-empty">Belum ada foto galeri</div>
+							{/if}
+							<div class="slot-actions">
+								<button class="btn btn-ghost" onclick={() => startPick('gallery')} disabled={uploadBusy}><Upload size={14} /> Upload / Ganti</button>
+							</div>
+						{/if}
+					</div>
+
+					{#if openSlot && openSlot !== 'gallery'}
+						{@const k = openSlot}
+						{@const curUrl = currentPhoto(k)}
+						{@const staged = pendingKind === k && pendingFiles.length > 0 ? pendingPreviews[0] : null}
+						<div class="slot-box">
+							<div class="slot-head"><h3 class="sec-title sub">Foto {k}</h3></div>
+							<div class="slot-preview">
+								{#if staged}
+									<img src={staged} alt="Foto baru" />
+									<span class="slot-badge">Baru — belum disimpan</span>
+								{:else if curUrl}
+									<img src={curUrl} alt={`Foto ${k} saat ini`} />
+									<span class="slot-badge">Foto saat ini</span>
+								{:else}
+									<div class="slot-empty">Belum ada foto {k}</div>
+								{/if}
+							</div>
+							<div class="slot-actions">
+								{#if staged}
+									<button class="btn btn-primary sm" onclick={confirmUpload} disabled={uploadBusy}>{uploadBusy ? 'Mengupload…' : 'Simpan / Ganti'}</button>
+									<button class="btn btn-ghost sm" onclick={clearPending} disabled={uploadBusy}>Batal</button>
+								{:else}
+									<button class="btn btn-ghost" onclick={() => startPick(k)} disabled={uploadBusy}><Upload size={14} /> Upload / Ganti</button>
+								{/if}
+							</div>
+							<p class="hint">Klik <strong>Upload / Ganti</strong>, pilih foto — pratinjau muncul di sini dulu, lalu konfirmasi <strong>Simpan / Ganti</strong>.</p>
 						</div>
 					{/if}
 					{#if uploadMsg}<p class="hint ok">{uploadMsg}</p>{/if}
-						{#if currentGallery().length > 0}
-							<div class="bulk-bar">
-								<label class="bulk-check">
-									<input type="checkbox" checked={selGallery.size === currentGallery().length} onchange={selGallery.size === currentGallery().length ? clearGallerySel : selectAllGallery} />
-									Pilih semua ({currentGallery().length})
-								</label>
-								{#if selGallery.size > 0}
-									<span class="bulk-count">{selGallery.size} dipilih</span>
-									<button class="btn btn-primary sm" onclick={deleteSelectedGallery} disabled={uploadBusy}>Hapus Terpilih ({selGallery.size})</button>
-									<button class="btn btn-ghost sm" onclick={clearGallerySel}>Batal</button>
-								{/if}
-							</div>
-							<h3 class="sec-title">Galeri Saat Ini <span class="count-pill">{currentGallery().length}</span></h3>
-							<div class="gallery-grid">
-								{#each currentGallery() as url, i}
-									<div class="gcell" class:sel={selGallery.has(url)}>
-										<label class="gsel" title="Pilih untuk hapus massal"><input type="checkbox" checked={selGallery.has(url)} onchange={() => toggleGallerySel(url)} /></label>
-										<img src={url} alt={`Foto ${i + 1}`} loading="lazy" />
-										<div class="gact">
-											<button class="icon-btn sm" onclick={() => moveGallery(i, -1)} disabled={i === 0} title="Naik">↑</button>
-											<button class="icon-btn sm" onclick={() => moveGallery(i, 1)} disabled={i === currentGallery().length - 1} title="Turun">↓</button>
-											<button class="icon-btn sm danger" onclick={() => deleteGalleryUrl(url)} title="Hapus"><Trash2 size={12} /></button>
-										</div>
-									</div>
-								{/each}
-							</div>
-						{:else}
-							<p class="muted empty-note">Belum ada foto galeri.</p>
-						{/if}
 					</div>
-				{:else if tab === 'konten'}
+					{:else if tab === 'konten'}
 					<div class="konten">
 						<div class="card pad konten-savebar">
 							<div>
@@ -1129,10 +1196,38 @@
 						<section class="card pad k-sec">
 							<h3 class="sec-title"><Link2 size={15} /> Sosial, Ucapan & Cover</h3>
 							<div class="grid2"><label><span>WhatsApp footer</span><input placeholder="https://wa.me/62812..." bind:value={kontenSocial.whatsapp} /></label><label><span>Instagram footer</span><input placeholder="https://instagram.com/..." bind:value={kontenSocial.instagram} /></label></div>
-							<label><span>Instagram Filter URL</span><input placeholder="https://www.instagram.com/ar/..." bind:value={kontenIgFilter} /></label>
+							<label><span>Instagram Filter (gambar)</span>
+								<div class="img-field">
+									{#if kontenIgFilter}<img class="img-thumb" src={kontenIgFilter} alt="Filter" loading="lazy" />{/if}
+									<div class="img-inputs">
+										<input placeholder="https://www.instagram.com/ar/... atau URL gambar" bind:value={kontenIgFilter} />
+										<div class="img-actions">
+											<button type="button" class="btn btn-ghost sm" onclick={() => kontenUpload('igfilter')} disabled={uploadBusy}><Upload size={13} /> Upload</button>
+											<select class="img-pick" aria-label="Pilih dari galeri" onchange={(e) => (kontenIgFilter = e.currentTarget.value)}>
+												<option value="">Pilih dari galeri…</option>
+												{#each currentGallery() as g, i}<option value={g}>Galeri — Foto {i + 1}</option>{/each}
+											</select>
+										</div>
+									</div>
+								</div>
+							</label>
 							<div class="grid2"><label><span>Min. nama (karakter)</span><input type="number" min="1" max="50" bind:value={kontenWishes.minName} /></label><label><span>Min. pesan (karakter)</span><input type="number" min="1" max="500" bind:value={kontenWishes.minMessage} /></label></div>
 							<label><span>Catatan ucapan</span><input placeholder="Khusus untuk tamu undangan" bind:value={kontenWishes.note} /></label>
-							<label><span>Foto cover sampul</span><input placeholder="URL Supabase atau /photos/hero" bind:value={kontenPhotosCover} /></label>
+							<label><span>Foto cover sampul</span>
+								<div class="img-field">
+									{#if kontenPhotosCover}<img class="img-thumb" src={kontenPhotosCover} alt="Cover" loading="lazy" />{/if}
+									<div class="img-inputs">
+										<input placeholder="URL Supabase atau /photos/hero" bind:value={kontenPhotosCover} />
+										<div class="img-actions">
+											<button type="button" class="btn btn-ghost sm" onclick={() => kontenUpload('cover')} disabled={uploadBusy}><Upload size={13} /> Upload</button>
+											<select class="img-pick" aria-label="Pilih dari galeri" onchange={(e) => (kontenPhotosCover = e.currentTarget.value)}>
+												<option value="">Pilih dari galeri…</option>
+												{#each currentGallery() as g, i}<option value={g}>Galeri — Foto {i + 1}</option>{/each}
+											</select>
+										</div>
+									</div>
+								</div>
+							</label>
 						</section>
 
 						<section class="card pad k-sec">
@@ -2308,25 +2403,6 @@
 		display: flex;
 		gap: 0.5rem;
 	}
-	.preview-box {
-		display: grid;
-		gap: 0.7rem;
-		border: 1px solid var(--line);
-		border-radius: 12px;
-		padding: 1rem;
-		background: var(--bg);
-	}
-	.pv-head {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 0.8rem;
-		flex-wrap: wrap;
-	}
-	.pv-actions {
-		display: flex;
-		gap: 0.5rem;
-	}
 	.pv-grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
@@ -2807,5 +2883,101 @@
 		.search-box {
 			max-width: none;
 		}
+	}
+
+	/* ===== Field gambar (upload / pilih dari galeri) ===== */
+	.img-field {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.75rem;
+		margin-top: 0.3rem;
+	}
+	.img-thumb {
+		width: 64px;
+		height: 64px;
+		object-fit: cover;
+		border-radius: 10px;
+		border: 1px solid var(--line);
+		background: var(--line-soft);
+		flex-shrink: 0;
+	}
+	.img-inputs {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		min-width: 0;
+	}
+	.img-actions {
+		display: flex;
+		gap: 0.5rem;
+		align-items: center;
+		flex-wrap: wrap;
+	}
+	.img-pick {
+		flex: 1;
+		min-width: 140px;
+		background: var(--card);
+		border: 1px solid var(--line);
+		color: var(--ink);
+		border-radius: 8px;
+		padding: 0.35em 0.6em;
+		font-size: 12.5px;
+		font-family: inherit;
+	}
+
+	/* ===== Dark mode ===== */
+	.shell.dark {
+		--bg: #0f172a;
+		--card: #1e293b;
+		--line: #334155;
+		--line-soft: #283548;
+		--ink: #e2e8f0;
+		--ink-2: #94a3b8;
+		--ink-3: #64748b;
+		--accent: #3b82f6;
+		--accent-strong: #60a5fa;
+		--accent-soft: #17294d;
+		--ok: #4ade80;
+		--ok-bg: #0d2a1c;
+		--warn: #fbbf24;
+		--warn-bg: #2b2007;
+		--danger: #f87171;
+		--danger-bg: #331118;
+		--shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.35);
+		--shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55);
+	}
+	.shell.dark th {
+		background: #16213a;
+	}
+	.shell.dark tbody tr:hover {
+		background: #1c2a44;
+	}
+	.shell.dark .chips button:hover,
+	.shell.dark .btn-ghost:hover,
+	.shell.dark .btn-action:hover {
+		border-color: #475569;
+		background: #233047;
+	}
+	.shell.dark .pill.ok {
+		border-color: #1c6b46;
+	}
+	.shell.dark .pill.warn {
+		border-color: #7a5a12;
+	}
+	.shell.dark .btn-action.danger:hover,
+	.shell.dark .icon-btn.danger:hover,
+	.shell.dark .alert.err {
+		border-color: #7f2d34;
+	}
+	.shell.dark .sk {
+		background: linear-gradient(90deg, #1c2740 25%, #243152 50%, #1c2740 75%);
+	}
+	.shell.dark .toast {
+		background: #0b1220;
+		box-shadow: var(--shadow-lg);
+	}
+	.shell.dark .modal {
+		box-shadow: var(--shadow-lg);
 	}
 </style>
