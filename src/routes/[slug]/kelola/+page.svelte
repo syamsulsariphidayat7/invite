@@ -23,7 +23,8 @@
 		Moon,
 		Sun,
 		ChevronDown,
-		MessageSquare
+		MessageSquare,
+		Download
 	} from 'lucide-svelte';
 
 	let { data } = $props();
@@ -58,6 +59,15 @@
 	let showClearAll = $state(false);
 	let clearingAll = $state(false);
 	let confirmDeleteTarget = $state<GuestRow | null>(null);
+
+	// ---- PWA install prompt ----
+	interface BeforeInstallPromptEvent extends Event {
+		prompt: () => Promise<void>;
+		userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+	}
+	let installEvt = $state<BeforeInstallPromptEvent | null>(null);
+	let showInstall = $state(false);
+	let installed = $state(false);
 	let deletingSingle = $state(false);
 
 	let toast = $state<{ msg: string; type: 'ok' | 'err' } | null>(null);
@@ -137,6 +147,40 @@
 			}
 		} catch {}
 	});
+
+	onMount(() => {
+		const standalone =
+			window.matchMedia('(display-mode: standalone)').matches ||
+			(navigator as { standalone?: boolean }).standalone === true;
+		installed = standalone;
+		const onInstallPrompt = (e: Event) => {
+			e.preventDefault();
+			installEvt = e as BeforeInstallPromptEvent;
+			if (!installed) showInstall = true;
+		};
+		const onInstalled = () => {
+			installed = true;
+			showInstall = false;
+			installEvt = null;
+		};
+		window.addEventListener('beforeinstallprompt', onInstallPrompt);
+		window.addEventListener('appinstalled', onInstalled);
+		return () => {
+			window.removeEventListener('beforeinstallprompt', onInstallPrompt);
+			window.removeEventListener('appinstalled', onInstalled);
+		};
+	});
+
+	async function installApp() {
+		if (!installEvt) return;
+		await installEvt.prompt();
+		const choice = await installEvt.userChoice;
+		installEvt = null;
+		if (choice.outcome === 'accepted') {
+			installed = true;
+			showInstall = false;
+		}
+	}
 
 	let templateSaveTimer: ReturnType<typeof setTimeout> | null = null;
 	$effect(() => {
@@ -541,6 +585,9 @@
 
 <svelte:head>
 	<title>Kelola Tamu — {slug}</title>
+	<link rel="manifest" href={`/${slug}/kelola/manifest.webmanifest`} />
+	<meta name="theme-color" content="#2563eb" />
+	<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
 </svelte:head>
 
 <div class="shell" class:dark={dark}>
@@ -561,6 +608,20 @@
 			{/if}
 		</div>
 	</header>
+
+	{#if showInstall}
+		<div class="install-banner" role="dialog" aria-label="Install aplikasi">
+			<div class="install-info">
+				<div class="install-ic"><Download size={16} /></div>
+				<div class="install-txt">
+					<strong>Install aplikasi</strong>
+					<span>Buka Kelola Tamu langsung dari layar utama.</span>
+				</div>
+			</div>
+			<button class="btn btn-primary sm" onclick={installApp}>Install</button>
+			<button class="icon-btn" onclick={() => (showInstall = false)} title="Tutup" aria-label="Tutup"><X size={15} /></button>
+		</div>
+	{/if}
 
 	<main class="main">
 		{#if !authed}
@@ -796,6 +857,8 @@
 		--shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
 		--shadow-lg: 0 16px 40px rgba(15, 23, 42, 0.14);
 
+		--install-z: 95;
+
 		min-height: 100svh;
 		background: var(--bg);
 		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -803,6 +866,64 @@
 		font-size: 14px;
 		line-height: 1.5;
 	}
+
+	.install-banner {
+		position: fixed;
+		left: 50%;
+		transform: translateX(-50%);
+		bottom: max(0.8rem, env(safe-area-inset-bottom));
+		z-index: var(--install-z);
+		width: min(100% - 1.6rem, 480px);
+		display: flex;
+		align-items: center;
+		gap: 0.55rem;
+		padding: 0.6rem 0.7rem;
+		background: var(--card);
+		border: 1px solid var(--line);
+		border-radius: 14px;
+		box-shadow: var(--shadow-lg);
+		animation: install-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+	}
+	.install-info {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		min-width: 0;
+		flex: 1;
+	}
+	.install-ic {
+		display: grid;
+		place-items: center;
+		width: 34px;
+		height: 34px;
+		border-radius: 10px;
+		background: var(--accent-soft);
+		color: var(--accent-strong);
+		flex-shrink: 0;
+	}
+	.install-txt {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+		font-size: 12px;
+		line-height: 1.35;
+		color: var(--ink-2);
+	}
+	.install-txt strong {
+		color: var(--ink);
+		font-size: 13px;
+	}
+	@keyframes install-in {
+		from {
+			opacity: 0;
+			transform: translate(-50%, 12px);
+		}
+		to {
+			opacity: 1;
+			transform: translate(-50%, 0);
+		}
+	}
+
 	.shell * {
 		box-sizing: border-box;
 	}
