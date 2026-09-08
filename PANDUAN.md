@@ -1,6 +1,6 @@
 # PANDUAN PENGGUNAAN — Undangan (invite.boundless.my.id)
 
-Panduan lengkap untuk tiga peran: **Admin** (operator platform), **Konsumen** (pemilik undangan), dan **Tamu** (penerima undangan). Berlaku untuk kondisi aplikasi per 2026-09-07.
+Panduan lengkap untuk tiga peran: **Admin** (operator platform), **Konsumen** (pemilik undangan), dan **Tamu** (penerima undangan). Berlaku untuk kondisi aplikasi per 2026-09-08.
 
 ---
 
@@ -45,10 +45,10 @@ Setelah dibuat, isi kontennya di tab **Konten** (2.5). Status baru = `draft` →
 Statistik tamu & ucapan + **Export**: pilih jenis (Tamu/Ucapan) → tombol **CSV**, **Excel**, atau **PDF**.
 
 ### 2.4 Tab Foto (Storage)
-Upload ke Supabase Storage bucket `invitation-photos/{slug}/` — otomatis dikompresi **sharp** (1600px, JPEG q82):
-- **Galeri** (max 12 file/upload) — muncul di section Galeri undangan
-- **Hero / Bride / Groom / Cover** — foto utama & sampul (masing-masing 1 file)
-- Aksi: **↑↓** reorder galeri, **hapus** per foto
+Satu pintu upload ke Supabase Storage bucket `invitation-photos/{slug}/` — otomatis dikompresi **sharp** (1600px, JPEG q82):
+- **Pilih Foto** (max 12 file/upload) → pratinjau → **Simpan N foto** — semua foto masuk **galeri** (muncul di section Galeri undangan)
+- Setiap foto galeri bisa dijadikan **Hero / Bride / Groom / Sampul** (boleh rangkap) lewat tombol peran di bawah foto; **badge di pojok foto** menandai peran yang sedang dipakai — foto tanpa peran berbadge **Galeri**
+- Aksi: **↑↓** reorder galeri, **hapus** per foto, centang untuk **hapus massal**
 
 ### 2.5 Tab Konten (Isi Undangan)
 Semua field mengisi `data_json`; kosong = pakai nilai default dari `wedding.ts`. Section:
@@ -59,7 +59,7 @@ Semua field mengisi `data_json`; kosong = pakai nilai default dari `wedding.ts`.
 - **Lokasi** — nama venue, alamat, maps URL (menang atas turunan dari events)
 - **Ayat** — toggle tampil/sembunyi + arab, terjemahan, sumber
 - **Love Story** — intro + bab (judul & teks), tambah/hapus dinamis
-- **Sosial, Ucapan & Cover** — WA/IG footer, IG Filter URL, min. karakter nama & pesan, catatan ucapan, foto cover sampul
+- **Sosial & Ucapan** — WA/IG footer, min. karakter nama & pesan, catatan ucapan (foto cover sampul diatur di tab Foto → peran Sampul)
 - **Tema & Media** — warna primary/secondary (override palet), Music URL, YouTube ID fallback, mulai detik ke-, Livestream URL
 
 Simpan → **Simpan Konten** (menimpa `data_json`; preview langsung di `/{slug}`).
@@ -123,7 +123,7 @@ Template pesan default: `Halo {nama}, kamu diundang... {link} ...` — bisa diub
 ## 7. Struktur Data & Konten Default
 
 - Konten default: `src/lib/data/wedding.ts` (dipakai bila `data_json` kosong)
-- Kontrak `data_json`: lihat `ARCHITECTURE.md` §5 (theme, couple, photos, gallery, verse, events, gifts, gift_note, love_story, venue, social, instagram_filter_url, wishes, music, livestream_url)
+- Kontrak `data_json`: lihat `ARCHITECTURE.md` §5 (theme, couple, photos, gallery, verse, events, gifts, gift_note, love_story, venue, social, wishes, music, livestream_url)
 - `resolve.ts` menggabungkan default + override → komponen (`ARCHITECTURE.md` §6)
 - Foto: `/static/photos/{base}.jpg` (Photo mencoba .jpg→.jpeg→.png→.webp→placeholder)
 

@@ -12,7 +12,7 @@ Dibuat dari pemindaian menyeluruh (2026-09-07). Ini peta referensi: struktur, al
 | Database | Supabase Postgres (pooler Supavisor port 6543, mode transaksi), driver `postgres` (postgres.js), `prepare: false` |
 | Storage | Supabase Storage bucket `invitation-photos/{slug}/` via `@supabase/supabase-js` + kompresi `sharp` (1600px JPEG q82 mozjpeg) |
 | Deploy | Vercel (`@sveltejs/adapter-vercel`, runtime `nodejs24.x` — dikonfigurasi di `vite.config.ts`, **tidak ada `svelte.config.js`**) |
-| Anti-spam | Rate limit in-memory + honeypot + Cloudflare Turnstile (kode siap, env belum) |
+| Anti-spam | Rate limit in-memory + honeypot + Cloudflare Turnstile (aktif, env terisi) |
 | Ikon/font | lucide-svelte; Google Fonts di `src/app.html` |
 | Export admin | exceljs (XLSX) + jspdf (PDF) |
 
@@ -128,7 +128,6 @@ gift_note: string
 love_story: [{ title, text }], love_story_intro: string
 venue:  { name, address, maps_url }                → menang atas turunan events
 social: { whatsapp, instagram }                    → footer
-instagram_filter_url: string
 wishes: { minName, minMessage, note }
 music:  { src, youtubeId, startSeconds } (atau kunci datar music_url / music_youtube_id / music_start_seconds)
 livestream_url: string
@@ -147,7 +146,7 @@ personalize_greeting: boolean
 | Couple | 2 mempelai + sosmed (relation di-escape anti-XSS) | weddingData |
 | Verse | ayat Al-Qur'an | weddingData |
 | Events | countdown + kartu akad/resepsi + sticky countdown | weddingData |
-| Gallery | grid + lightbox + blok IG filter | gallery, weddingData |
+| Gallery | grid + lightbox | gallery, weddingData |
 | LoveStory | timeline bab | weddingData |
 | Gift | amplop digital, salin nomor | weddingData |
 | Wishes | form ucapan (stepper kehadiran, Turnstile, pagination) | initialWishes, initialTotal, guestName, slug, weddingData |
@@ -169,7 +168,7 @@ Pola konsisten: `weddingData` prop + `const w = $derived((weddingData ?? wedding
 | `GET/POST/PATCH/DELETE /api/admin/invitations` | admin | CRUD undangan (validasi subdomain, status, dataJson) |
 | `POST/DELETE /api/admin/login` | — | login/logout PIN (rate 5/15 menit) |
 | `GET/DELETE /api/admin/wishes` | admin | moderasi ucapan + export XLSX/PDF (tamu/ucapan) |
-| `POST/DELETE /api/admin/upload` | admin | upload sharp ke Storage (kind: gallery/hero/bride/groom/cover), hapus/reorder |
+| `POST/DELETE /api/admin/upload` | admin | upload sharp ke Storage (kind: gallery/music), hapus/reorder; peran foto (hero/bride/groom/cover) di-assign via PATCH invitations `photos` |
 | `GET /api/health` | — | keep-warm (cron Vercel `0 6 * * *`) |
 
 ## 8. Environment Variables
@@ -193,5 +192,6 @@ Pola konsisten: `weddingData` prop + `const w = $derived((weddingData ?? wedding
 6. **Rate limit in-memory** — reset saat instance restart (cukup untuk 1 instance Vercel; catatan untuk skala).
 7. `vite.config.ts` menyetel `runes: true` global — komponen wajib pola runes.
 8. `static/photos/placeholders/` masih ada sebagai fallback Photo (bukan bug).
-9. Halaman `/[slug]` meng-hide section bila datanya kosong (mis. livestream, IG filter, verse null) — kontrak "section kosong = disembunyikan" sudah terpenuhi sebagian (Verse/Gallery/Events sudah; sisanya lewat fallback wedding.ts).
+9. Halaman `/[slug]` meng-hide section bila datanya kosong (mis. livestream, verse null) — kontrak "section kosong = disembunyikan" sudah terpenuhi sebagian (Verse/Gallery/Events sudah; sisanya lewat fallback wedding.ts).
 10. ~~Pola `${JSON.stringify(x)}::jsonb`~~ ✅ **Sudah diperbaiki** (2026-09-07, commit `d7b43b6`): postgres.js meng-serialize parameter itu dua kali → `jsonb_typeof(data_json)` jadi `string` → melanggar CHECK `invitations_data_json_check` → semua PATCH/POST admin 500 "Internal Error". Sekarang semua penulisan JSONB lewat helper `jsonb()` (`sql.json()`) di `src/lib/server/db.ts`. **Aturan: jangan pernah menulis kolom JSONB dengan stringify manual.**
+11. **Admin tab Foto (2026-09-08)**: satu pintu upload → galeri (`/api/admin/upload` hanya menerima `kind=gallery|music`); peran foto (hero/bride/groom/cover) di-assign dari galeri via PATCH `invitations` (`photos.{hero|bride|groom|cover}` = URL galeri, boleh rangkap). Badge di pojok tiap foto galeri menampilkan semua peran yang dipakai (`rolesOf()`); foto tanpa peran berbadge "Galeri".

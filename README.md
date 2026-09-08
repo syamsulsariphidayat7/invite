@@ -1,111 +1,94 @@
-# Undangan — Undangan Pernikahan (SvelteKit)
+# Undangan — Undangan Pernikahan Digital (SvelteKit)
 
-Undangan digital pernikahan Ruhaeni & Roni, replika UI dari
-[lovestory.web.id/amel-dendi](https://lovestory.web.id/amel-dendi/) dengan
-tumpukan **SvelteKit + TypeScript + Neon Postgres**, dirancang agar mudah
-berkembang menjadi platform **multi-tema + panel admin**.
+Platform undangan pernikahan digital **multi-undangan** (SaaS): satu kode,
+banyak undangan. Setiap undangan punya slug sendiri (`invite.boundless.my.id/{slug}`),
+kontennya tersimpan di database Supabase (`invitations.data_json`), dan
+dikelola lewat panel admin.
+
+**Stack:** SvelteKit (Svelte 5, runes) · TypeScript · Supabase Postgres
+(driver `postgres`/postgres.js, pooler 6543) · Supabase Storage + sharp ·
+Vercel (`@sveltejs/adapter-vercel`) · lucide-svelte
 
 ## Fitur
 
-- 🎬 Layar sampul "Buka Undangan" + musik latar (tombol play/pause)
-- 👰🤵 Profil mempelai, ayat, dan hitung mundur menuju acara
-- 📅 Detail acara Akad & Resepsi (tanggal, jam, lokasi) dengan tombol
-  tambah ke Google Calendar
-- 🖼️ Galeri foto
-- 💌 Love story 3 bab (Pertemuan, Komitmen, Menikah)
-- 💳 Amplop digital (rekening & QRIS)
-- 💬 Ucapan & doa tamu tersimpan ke **Neon Postgres** (dengan fallback
-  memori bila DB tidak terhubung)
-- 📱 Navigasi bawah & desain responsif mobile-first
-- 🌙 Ornamen & font dekoratif sesuai referensi
+- 🎬 Layar sampul "Buka Undangan" + musik latar (audio / fallback YouTube)
+- 👰🤵 Profil mempelai, ayat Al-Qur'an, hitung mundur, akad & resepsi
+- 📅 Detail acara + tombol Save-the-Date ke Google Calendar
+- 🖼️ Galeri foto + lightbox
+- 💌 Love story, amplop digital, ucapan & doa tamu (anti-spam: rate limit +
+  honeypot + Cloudflare Turnstile)
+- 🎨 Multi-layout: `classic` & `rose` (dropdown di admin, preview `?template=`)
+- 🔐 Panel admin `/admin` — CRUD undangan, tab Foto (storage + peran),
+  tab Konten (editor `data_json`), moderasi & export ucapan/tamu
+- 👥 Kelola tamu konsumen `/{slug}/kelola` (PIN 6-digit, bulk WhatsApp)
+- 🛡️ Anti-XSS (relation mempelai di-escape), rate limit per-endpoint
 
-## Struktur Proyek
+## Struktur
 
 ```
 src/
 ├── lib/
-│   ├── data/wedding.ts      ← SEMUA konten undangan di satu file (ganti di sini)
-│   ├── server/wishes.ts     ← Lapisan DB (Neon) untuk ucapan tamu
-│   ├── music.svelte.ts      ← Store musik (svelte 5 runes)
-│   ├── assets/              ← favicon & aset
-│   └── components/          ← Komponen per section (Hero, Couple, Events, ...)
+│   ├── data/wedding.ts      ← konten DEFAULT (fallback bila data_json kosong)
+│   ├── data/resolve.ts      ← resolveWedding(dataJson): override DB → konten
+│   ├── layouts/             ← multi-layout (classic/, rose/, registry, meta)
+│   ├── server/              ← db.ts (postgres.js + helper jsonb), wishes,
+│   │                          invitations, guests, rateLimit
+│   ├── components/          ← komponen per section (Hero, Couple, Verse, ...)
+│   └── music.svelte.ts      ← store musik (runes)
 ├── routes/
-│   ├── +page.server.ts      ← Loader (fetch ucapan dari DB, SSR)
-│   ├── +page.svelte         ← Halaman utama
-│   └── api/wishes/+server.ts← Endpoint API ucapan (POST + GET)
-static/
-└── photos/                  ← Tempat foto mempelai & galeri (lihat README di folder itu)
+│   ├── +page.*              ← root: redirect / listing undangan aktif
+│   ├── [slug]/              ← halaman undangan dinamis (+ /kelola ber-PIN)
+│   ├── admin/               ← panel admin + login
+│   └── api/                 ← wishes, guests(+template), admin/*, health
+db/schema.sql                ← DDL Supabase (invitations, guest_wishes, invitation_guests)
+scripts/                     ← migrate-to-supabase, migrate-media, seed-demo, check-db
 ```
 
 ## Persiapan Lokal
 
 ```sh
 pnpm install
-cp .env.example .env   # isi DATABASE_URL dengan string koneksi Neon
+cp .env.example .env   # isi DATABASE_URL, ADMIN_PIN, SUPABASE_URL, SUPABASE_SECRET_KEY
 pnpm dev
 ```
 
-Buka http://localhost:5173 — untuk pratinjau tanpa menekan tombol
-"Buka Undangan", tambahkan `?preview=1` di URL.
+Buka http://localhost:5173 — preview tanpa layar sampul: tambahkan `?preview=1`.
 
-### Database (Neon Postgres)
+### Database (Supabase)
 
-1. Buat project di [neon.tech](https://neon.tech) (tier gratis cukup).
-2. Salin connection string **pooled** (`-pooler`):
-   `postgresql://user:pass@ep-xxx-pooler.aws.neon.tech/neondb?sslmode=require`
-3. Masukkan ke `.env` sebagai `DATABASE_URL`.
-4. Buat tabel (otomatis dibuat saat pertama kali ada ucapan masuk, atau jalankan
-   manual):
-
-```sql
-CREATE TABLE IF NOT EXISTS guest_wishes (
-  id          SERIAL PRIMARY KEY,
-  wedding     TEXT NOT NULL DEFAULT 'ruhaeni-roni',
-  name        TEXT NOT NULL,
-  attendance  TEXT NOT NULL,
-  message     TEXT NOT NULL,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-```
-
-> 🔒 **Keamanan:** `DATABASE_URL` jangan pernah dimasukkan ke git —
-> `.env` sudah ter-gitignore. Jika string koneksi pernah bocor (misal terkirim
-> lewat chat), segera **Reset password** di dashboard Neon.
+1. Jalankan `db/schema.sql` sekali di Supabase SQL Editor.
+2. `DATABASE_URL` = connection string pooler Supavisor (port 6543); parser
+   custom tahan password berkarakter spesial (`?`).
+3. Tanpa `DATABASE_URL` aplikasi tetap jalan dengan fallback in-memory
+   (ucapan tidak tersimpan permanen).
 
 ## Deploy ke Vercel
 
-Proyek sudah pakai `@sveltejs/adapter-vercel` (runtime Node).
+- Sudah pakai `@sveltejs/adapter-vercel` (runtime Node, diset di
+  `vite.config.ts` — tidak ada `svelte.config.js`).
+- Push ke `main` → auto-deploy. Env: `DATABASE_URL`, `ADMIN_PIN`,
+  `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `TURNSTILE_SITE_KEY`,
+  `TURNSTILE_SECRET_KEY`.
 
-1. Push repo ke GitHub/GitLab, lalu **Import** di [vercel.com](https://vercel.com).
-2. Framework preset terdeteksi otomatis: **SvelteKit**. Build command: `pnpm build`.
-3. Tambahkan environment variable `DATABASE_URL` di **Settings → Environment Variables**
-   (paste string koneksi Neon; untuk production sebaiknya buat role/database khusus).
-4. Deploy. Endpoint API ucapan (`/api/wishes`) jalan sebagai serverless function
-   dan terhubung ke Neon via koneksi pooled.
+## Konten Undangan
 
-## Mengganti Konten Undangan
+- **Default:** `src/lib/data/wedding.ts` — dipakai bila `data_json` kosong.
+- **Per undangan:** tab Konten di `/admin` → tersimpan di
+  `invitations.data_json` (kontrak lengkap: `ARCHITECTURE.md` §5).
+- **Foto:** tab Foto di `/admin` → Supabase Storage `invitation-photos/{slug}/`
+  + kompresi sharp 1600px; peran Hero/Bride/Groom/Sampul di-assign dari galeri.
 
-Semua konten ada di **`src/lib/data/wedding.ts`**: nama mempelai, orang tua,
-tanggal/jam/lokasi akad & resepsi, love story, rekening, musik (YouTube ID),
-hingga slug undangan. Foto diarahkan ke `static/photos/` — lihat
-`static/photos/README.md` untuk daftar file yang perlu diganti.
+## Perintah
 
-## Arah Multi-Tema + Panel Admin
+| Perintah     | Fungsi                              |
+| ------------ | ----------------------------------- |
+| `pnpm dev`   | Development server                  |
+| `pnpm build` | Build produksi (adapter Vercel)     |
+| `pnpm preview` | Pratinjau hasil build             |
+| `pnpm check` | svelte-check + tsc (type checking)  |
 
-Saat ini konten statis di `wedding.ts` dan slug tunggal. Untuk berkembang jadi
-platform multi-tema:
+## Dokumen Lain
 
-- **Data per undangan**: pindahkan `wedding.ts` ke tabel `weddings` di Neon
-  (kolom JSONB untuk konten + kolom `theme`), rute dinamis `/invitation/[slug]`.
-- **Ucapan**: kolom `wedding` di `guest_wishes` sudah siap diisi slug undangan.
-- **Panel admin**: tambah rute `/admin` terproteksi (auth) untuk CRUD undangan,
-  galeri, dan moderasi ucapan — cukup membaca/menulis tabel yang sama.
-
-## Skrip
-
-| Perintah         | Fungsi                              |
-| ---------------- | ----------------------------------- |
-| `pnpm dev`       | Development server                  |
-| `pnpm build`     | Build produksi (adapter Vercel)     |
-| `pnpm preview`   | Pratinjau hasil build               |
-| `pnpm check`     | Svelte-check + tsc (type checking)  |
+- `PANDUAN.md` — panduan penggunaan (Admin / Konsumen / Tamu)
+- `ARCHITECTURE.md` — peta arsitektur, skema DB, API, env
+- `PROGRESS.md` — status fase pengembangan

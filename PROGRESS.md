@@ -1,9 +1,9 @@
 # PROGRESS.md — Undangan (Invite)
 
-Terakhir diperbarui: 2026-09-07
+Terakhir diperbarui: 2026-09-08
 
 ## Fase Aktif
-**Tidak ada fase besar sedang berjalan** — semua fitur inti selesai (per 2026-09-07). Item terbuka hanya operasional: isi env Turnstile (kode sudah siap), bersihkan data uji, matikan Neon lama. Fase 6 (multi-layout) & 7 (custom domain) masih future.
+**Tidak ada fase besar sedang berjalan** — semua fitur inti selesai (per 2026-09-08). Item terbuka hanya operasional: bersihkan data uji. Fase 6 (multi-layout) & 7 (custom domain) masih future.
 
 ## Status Fase
 | Fase | Status |
@@ -19,17 +19,20 @@ Terakhir diperbarui: 2026-09-07
 | Anti-spam (rate limit + honeypot) | ✅ Selesai — `rateLimit.ts`, `/api/wishes` 6/menit + `/api/guests` 20/menit, honeypot `website` |
 | Galeri Storage → `data_json.gallery` | ✅ Selesai — upload auto-append gallery (Photo direct URL), sinkron ke `/[slug]` |
 | WA Mass-share | ✅ Selesai — bulk select di `/{slug}/kelola`, salin link massal + buka WA berurutan + tandai terkirim |
-| Admin Full Editor | ✅ Selesai — tab Konten di `/admin`: events, gifts, couple, ayat, story, theme, music + **gift note, venue, social, IG filter, wishes, music YT/startSeconds, cover** |
+| Admin Full Editor | ✅ Selesai — tab Konten di `/admin`: events, gifts, couple, ayat, story, theme, music + **gift note, venue, social, wishes, music YT/startSeconds** |
 | Sharp Kompresi | ✅ Selesai — upload auto-resize 1600px JPEG 82 mozjpeg, gallery hapus/reorder |
 | Login Rate Limit | ✅ Selesai — `admin-login` 5/15 menit |
-| dataJson Wiring | ✅ Selesai — `resolve.ts` override penuh ke `/[slug]`: gift.note, venue, social, wishes, instagramFilterUrl, music youtubeId/startSeconds, photos cover |
+| dataJson Wiring | ✅ Selesai — `resolve.ts` override penuh ke `/[slug]`: gift.note, venue, social, wishes, music youtubeId/startSeconds, photos/gallery, verse, love_story, theme |
 | Turnstile captcha | ✅ Aktif & terverifikasi (2026-09-07) — env terisi di Vercel & lokal; POST tanpa token → 400 wajib, token palsu → 400 gagal (siteverify jalan) |
 | Fase 6 multi-layout | ✅ Tahap 1 — registry `src/lib/layouts/` + extract `classic` + layout baru `rose` + dropdown template di admin + preview `?template=` (noir & botanical menyusul) |
 | Migrasi media → Storage | ✅ (2026-09-07) — 15 foto + musik ruhaeni-roni di Supabase Storage `invitation-photos/ruhaeni-roni/`, `data_json.photos/gallery/music_url` berisi URL publik (script `scripts/migrate-media.mjs`) |
 | Anti-XSS | ✅ Selesai — `@html` relation Couple di-escape dulu (`safeRelation`), input admin tidak bisa injeksi HTML |
 | Fix jsonb PATCH admin | ✅ (2026-09-07) — pola `${JSON.stringify(x)}::jsonb` di postgres.js ter-encode ganda → melanggar CHECK `jsonb_typeof='object'` → semua edit panel admin 500 "Internal Error". Diganti helper `jsonb()` (`sql.json()`) di `db.ts` untuk create+update; trigger `updated_at` dipasang; script migrasi kini bisa re-seed `data_json` (`ON CONFLICT DO UPDATE`) |
+| Admin Dark Mode + WA link kelola | ✅ (2026-09-08) — dark mode panel admin; tombol **Kirim Link Kelola** membuka WhatsApp dengan link `/{slug}/kelola` + PIN pengelola |
+| Foto & Peran di Admin | ✅ (2026-09-08) — satu pintu upload (`kind` hanya gallery/music) → semua foto masuk galeri; peran **Hero/Bride/Groom/Sampul** di-assign dari galeri (boleh rangkap) dengan badge peran di pojok foto (tanpa peran = badge "Galeri"); reorder ↑↓, hapus per foto, hapus massal |
+| Hapus IG Filter | ✅ (2026-09-08) — fitur IG filter dihapus dari admin, `resolve.ts`, `wedding.ts`, dan `Gallery.svelte` |
 | Pre-production Cleanup | ✅ Selesai |
-| Deployment (Vercel + Neon) | ✅ Selesai — auto-deploy dari GitHub, custom domain `invite.boundless.my.id`, `DATABASE_URL` aktif (API ucapan 200 + data terbaca, 2026-09-06) |
+| Deployment (Vercel + Supabase) | ✅ Selesai — auto-deploy dari GitHub, custom domain `invite.boundless.my.id`, `DATABASE_URL` Supabase aktif (API ucapan 200 + data terbaca; cutover dari Neon 2026-09-06) |
 
 ## Sedang Dikerjakan
 - (kosong — lihat Langkah Berikutnya)
