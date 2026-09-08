@@ -29,6 +29,13 @@
 
 	let { data } = $props();
 	const slug: string = $derived(data.slug);
+	const w = $derived(data.resolved as unknown as { siteTitle?: string; namesShort?: string; photos?: { cover?: string; hero?: string } });
+	const coverPhoto = $derived(w?.photos?.cover || w?.photos?.hero || 'hero');
+	const ogImage = $derived(
+		coverPhoto.startsWith('http://') || coverPhoto.startsWith('https://')
+			? coverPhoto
+			: `${page.url.origin}/photos/${coverPhoto}.jpg`
+	);
 
 	interface GuestRow {
 		id: string;
@@ -588,6 +595,15 @@
 	<link rel="manifest" href={`/${slug}/kelola/manifest.webmanifest`} />
 	<meta name="theme-color" content="#2563eb" />
 	<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+
+	<meta property="og:title" content={w?.siteTitle ?? `Kelola Tamu — ${slug}`} />
+	<meta property="og:description" content="Link undangan pernikahan — Kelola daftar tamu" />
+	<meta property="og:image" content={ogImage} />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
+	<meta property="og:url" content="{page.url.origin}/{slug}/kelola" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:image" content={ogImage} />
 </svelte:head>
 
 <div class="shell" class:dark={dark}>

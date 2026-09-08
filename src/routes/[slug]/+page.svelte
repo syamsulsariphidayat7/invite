@@ -10,8 +10,20 @@
 	import { isKnownTemplate } from '$lib/layouts/meta';
 	import type { LayoutProps } from '$lib/layouts/types';
 	import { startMusic, setMusicSrc } from '$lib/music.svelte';
+	import type { ResolvedWedding } from '$lib/data/resolve';
 
 	let { data } = $props();
+
+	const w = $derived(data.resolved as unknown as ResolvedWedding);
+	const coverPhoto = $derived(w.photos?.cover || w.photos?.hero || 'hero');
+	const ogImage = $derived(
+		coverPhoto.startsWith('http://') || coverPhoto.startsWith('https://')
+			? coverPhoto
+			: `${page.url.origin}/photos/${coverPhoto}.jpg`
+	);
+	const metaDesc = $derived(
+		`Undangan pernikahan ${w.namesShort} — ${w.resepsi?.dayLabel ?? ''}`.trim()
+	);
 
 	let opened = $state(false);
 	let overlayVisible = $state(true);
@@ -96,6 +108,27 @@
 		setTimeout(() => (overlayVisible = false), 3200);
 	}
 </script>
+
+<svelte:head>
+	<title>{w.siteTitle}</title>
+	<meta name="description" content={metaDesc} />
+	<link rel="canonical" href="{page.url.origin}/{data.slug}" />
+
+	<meta property="og:type" content="website" />
+	<meta property="og:url" content="{page.url.origin}/{data.slug}" />
+	<meta property="og:title" content={w.siteTitle} />
+	<meta property="og:description" content={metaDesc} />
+	<meta property="og:image" content={ogImage} />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
+	<meta property="og:image:alt" content="Foto Pernikahan {w.namesShort}" />
+	<meta property="og:site_name" content={w.siteTitle} />
+
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content={w.siteTitle} />
+	<meta name="twitter:description" content={metaDesc} />
+	<meta name="twitter:image" content={ogImage} />
+</svelte:head>
 
 <Layout {...layoutProps} {guest} />
 
