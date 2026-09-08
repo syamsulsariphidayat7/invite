@@ -28,6 +28,7 @@
 - Commit utama pakai `feat:` (conventional commits).
 - Bahasa konten undangan: Indonesia.
 - Jangan sentuh proyek lain di `/srv/http` — hanya kerjakan di repo ini.
+- **Jangan commit atau push setiap perubahan.** Biarkan perubahan di working tree; commit sekaligus dalam satu commit ringkas hanya saat user minta (mis. "commit", "push", "deploy", atau instruksi serupa).
 
 ## Arah Pengembangan (SaaS multi-tenant — rencana Boundless)
 - Skema `invitations` + `guest_wishes` DIAPPROVE (2026-09-06): lihat `db/schema.sql` & `rencana-agent-boundless-invitation.md`.

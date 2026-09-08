@@ -424,7 +424,7 @@
 
 			<div class="kpis">
 				<div class="kpi">
-					<div class="kpi-ic" style="--c:#635bff;--bg:#eef0ff"><Users size={16} /></div>
+					<div class="kpi-ic" style="--c:#2563eb;--bg:#eff6ff"><Users size={16} /></div>
 					<div><strong>{stats.total}</strong><span>Total Tamu</span></div>
 				</div>
 				<div class="kpi">
@@ -615,24 +615,24 @@
 <style>
 	/* ===== Design tokens (konsisten dengan panel admin) ===== */
 	.shell {
-		--bg: #f4f5f7;
+		--bg: #f4f6f8;
 		--card: #ffffff;
-		--line: #e4e7ec;
-		--line-soft: #eef0f3;
-		--ink: #101828;
-		--ink-2: #475467;
-		--ink-3: #98a2b3;
-		--accent: #635bff;
-		--accent-strong: #4f46e5;
-		--accent-soft: #eef0ff;
-		--ok: #059669;
-		--ok-bg: #ecfdf5;
+		--line: #e2e8f0;
+		--line-soft: #edf1f5;
+		--ink: #0f172a;
+		--ink-2: #475569;
+		--ink-3: #94a3b8;
+		--accent: #2563eb;
+		--accent-strong: #1d4ed8;
+		--accent-soft: #eff6ff;
+		--ok: #16a34a;
+		--ok-bg: #f0fdf4;
 		--warn: #d97706;
 		--danger: #dc2626;
 		--danger-bg: #fef2f2;
-		--radius: 14px;
-		--shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 1px 3px rgba(16, 24, 40, 0.08);
-		--shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.16);
+		--radius: 12px;
+		--shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
+		--shadow-lg: 0 16px 40px rgba(15, 23, 42, 0.14);
 
 		min-height: 100svh;
 		background: var(--bg);
@@ -658,6 +658,7 @@
 		padding: 0 1.1rem;
 		background: var(--card);
 		border-bottom: 1px solid var(--line);
+		box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
 	}
 	.brand {
 		display: flex;
@@ -671,8 +672,8 @@
 		display: grid;
 		place-items: center;
 		color: #fff;
-		background: linear-gradient(135deg, var(--accent), #8b5cf6);
-		box-shadow: 0 2px 6px rgba(99, 91, 255, 0.35);
+		background: var(--accent);
+		box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
 	}
 	.brand-name {
 		font-weight: 700;
@@ -940,10 +941,10 @@
 		color: var(--ink);
 	}
 	.tabs button.active {
-		background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+		background: var(--accent);
 		color: #fff;
 		border-color: transparent;
-		box-shadow: 0 1px 3px rgba(79, 70, 229, 0.35);
+		box-shadow: 0 1px 2px rgba(37, 99, 235, 0.3);
 	}
 	.tabs b {
 		font-weight: 600;
@@ -1127,12 +1128,13 @@
 		cursor: not-allowed;
 	}
 	.btn-primary {
-		background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+		background: var(--accent);
 		color: #fff;
-		box-shadow: 0 1px 3px rgba(79, 70, 229, 0.35);
+		box-shadow: 0 1px 2px rgba(37, 99, 235, 0.3);
 	}
 	.btn-primary:hover {
-		box-shadow: 0 3px 8px rgba(79, 70, 229, 0.4);
+		background: var(--accent-strong);
+		box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
 	}
 	.btn-ghost {
 		background: var(--card);
@@ -1257,8 +1259,8 @@
 		display: grid;
 		place-items: center;
 		color: #fff;
-		background: linear-gradient(135deg, var(--accent), #8b5cf6);
-		box-shadow: 0 4px 10px rgba(99, 91, 255, 0.35);
+		background: var(--accent);
+		box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
 	}
 	.pin-card h1 {
 		margin: 0;
