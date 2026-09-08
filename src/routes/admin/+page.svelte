@@ -15,14 +15,17 @@
 		MessageCircle,
 		LayoutDashboard,
 		FileText,
-		ArrowLeft,
 		Menu,
 		X,
 		Image as ImageIcon,
 		Music,
 		MapPin,
 		Link2,
-		Palette
+		Palette,
+		Search,
+		ChevronDown,
+		PanelLeftClose,
+		PanelLeftOpen
 	} from 'lucide-svelte';
 
 	interface InvitationItem {
@@ -65,7 +68,13 @@
 	let uploadBusy = $state(false);
 	let uploadMsg = $state('');
 	let exportType = $state<'tamu' | 'ucapan'>('tamu');
+
+	// Layout state
 	let sidebarOpen = $state(false);
+	let sidebarCollapsed = $state(false);
+	let userMenu = $state(false);
+	let searchQ = $state('');
+	let statusF = $state<'all' | 'active' | 'draft' | 'expired'>('all');
 
 	let toast = $state<{ msg: string; type: 'ok' | 'err' } | null>(null);
 	let toastTimer: ReturnType<typeof setTimeout> | null = null;
@@ -97,42 +106,31 @@
 		return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
 	}
 
-	let kontenSaving = $state(false);
-	let kontenMsg = $state('');
-	let kontenEvents = $state<{ name: string; date: string; time: string; location: string; map_url: string }[]>([]);
-	let kontenGifts = $state<{ type: string; provider: string; owner: string; number: string }[]>([]);
-	let kontenBride = $state({ name: '', full_name: '', relation: '', instagram: '', whatsapp: '' });
-	let kontenGroom = $state({ name: '', full_name: '', relation: '', instagram: '', whatsapp: '' });
-	let kontenVerse = $state({ arabic: '', translation: '', source: '' });
-	let kontenVerseOff = $state(false);
-	let kontenThemePrimary = $state('#8b5e3c');
-	let kontenThemeSecondary = $state('#f5ebe0');
-	let kontenMusic = $state('');
-	let kontenLivestream = $state('');
-	let kontenStoryIntro = $state('');
-	let kontenStoryChapters = $state<{ title: string; text: string }[]>([]);
-	let kontenGiftNote = $state('');
-	let kontenVenue = $state({ name: '', address: '', maps_url: '' });
-	let kontenSocial = $state({ whatsapp: '', instagram: '' });
-	let kontenIgFilter = $state('');
-	let kontenWishes = $state({ minName: 2, minMessage: 2, note: '' });
-	let kontenMusicYt = $state('');
-	let kontenMusicStart = $state('');
-	let kontenPhotosCover = $state('');
+	const counts = $derived({
+		all: items.length,
+		active: items.filter((i) => i.status === 'active').length,
+		draft: items.filter((i) => i.status === 'draft').length,
+		expired: items.filter((i) => i.status === 'expired').length
+	});
 
-	let showForm = $state(false);
-	let editing = $state<string | null>(null);
-	let formSubdomain = $state('');
-	let formPihak1 = $state('');
-	let formPihak2 = $state('');
-	let formTanggal = $state('');
-	let formStatus = $state('draft');
-	let formTemplate = $state(DEFAULT_TEMPLATE);
-	let formPin = $state('');
-	let formSaving = $state(false);
-	let formErr = $state('');
+	const filteredItems = $derived(
+		items.filter((it) => {
+			const q = searchQ.trim().toLowerCase();
+			const matchQ =
+				!q ||
+				it.subdomain.toLowerCase().includes(q) ||
+				`${it.namaPihak1} ${it.namaPihak2}`.toLowerCase().includes(q);
+			const matchS = statusF === 'all' || it.status === statusF;
+			return matchQ && matchS;
+		})
+	);
 
-	let cur = $derived(items.find((x) => x.subdomain === selected));
+	function toggleRail() {
+		sidebarCollapsed = !sidebarCollapsed;
+		try {
+			localStorage.setItem('admin_rail', sidebarCollapsed ? '1' : '0');
+		} catch {}
+	}
 
 	async function load() {
 		loading = true;
@@ -157,9 +155,15 @@
 		}
 	}
 
-	onMount(load);
+	onMount(() => {
+		try {
+			if (localStorage.getItem('admin_rail') === '1') sidebarCollapsed = true;
+		} catch {}
+		load();
+	});
 
 	function openCreate() {
+		userMenu = false;
 		editing = null;
 		formSubdomain = '';
 		formPihak1 = '';
@@ -173,6 +177,7 @@
 	}
 
 	function openEdit(it: InvitationItem) {
+		userMenu = false;
 		editing = it.subdomain;
 		formSubdomain = it.subdomain;
 		formPihak1 = it.namaPihak1;
@@ -278,7 +283,45 @@
 		selected = null;
 		tab = 'overview';
 		sidebarOpen = false;
+		userMenu = false;
 	}
+
+	let kontenSaving = $state(false);
+	let kontenMsg = $state('');
+	let kontenEvents = $state<{ name: string; date: string; time: string; location: string; map_url: string }[]>([]);
+	let kontenGifts = $state<{ type: string; provider: string; owner: string; number: string }[]>([]);
+	let kontenBride = $state({ name: '', full_name: '', relation: '', instagram: '', whatsapp: '' });
+	let kontenGroom = $state({ name: '', full_name: '', relation: '', instagram: '', whatsapp: '' });
+	let kontenVerse = $state({ arabic: '', translation: '', source: '' });
+	let kontenVerseOff = $state(false);
+	let kontenThemePrimary = $state('#8b5e3c');
+	let kontenThemeSecondary = $state('#f5ebe0');
+	let kontenMusic = $state('');
+	let kontenLivestream = $state('');
+	let kontenStoryIntro = $state('');
+	let kontenStoryChapters = $state<{ title: string; text: string }[]>([]);
+	let kontenGiftNote = $state('');
+	let kontenVenue = $state({ name: '', address: '', maps_url: '' });
+	let kontenSocial = $state({ whatsapp: '', instagram: '' });
+	let kontenIgFilter = $state('');
+	let kontenWishes = $state({ minName: 2, minMessage: 2, note: '' });
+	let kontenMusicYt = $state('');
+	let kontenMusicStart = $state('');
+	let kontenPhotosCover = $state('');
+
+	let showForm = $state(false);
+	let editing = $state<string | null>(null);
+	let formSubdomain = $state('');
+	let formPihak1 = $state('');
+	let formPihak2 = $state('');
+	let formTanggal = $state('');
+	let formStatus = $state('draft');
+	let formTemplate = $state(DEFAULT_TEMPLATE);
+	let formPin = $state('');
+	let formSaving = $state(false);
+	let formErr = $state('');
+
+	let cur = $derived(items.find((x) => x.subdomain === selected));
 
 	function hydrateKonten(it: InvitationItem) {
 		const dj = (it.dataJson ?? {}) as Record<string, unknown>;
@@ -319,6 +362,7 @@
 		selected = sd;
 		tab = t;
 		sidebarOpen = false;
+		userMenu = false;
 		detailLoading = true;
 		try {
 			const [gRes, wRes] = await Promise.all([
@@ -514,6 +558,9 @@
 	<header class="topbar">
 		<div class="topbar-left">
 			<button class="burger" onclick={() => (sidebarOpen = !sidebarOpen)} aria-label="Buka menu"><Menu size={20} /></button>
+			<button class="collapse-btn" onclick={toggleRail} aria-label="Ciutkan/perluas sidebar" title={sidebarCollapsed ? 'Perluas sidebar' : 'Ciutkan sidebar'}>
+				{#if sidebarCollapsed}<PanelLeftOpen size={18} />{:else}<PanelLeftClose size={18} />{/if}
+			</button>
 			<div class="brand">
 				<div class="logo-mark">
 					<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
@@ -526,23 +573,47 @@
 			</div>
 		</div>
 		<div class="topbar-right">
-			<div class="user-chip">
-				<div class="avatar">AD</div>
-				<div class="user-meta">
-					<strong>Administrator</strong>
-					<span>Superuser</span>
-				</div>
+			<button class="btn btn-primary sm top-create" onclick={openCreate}><Plus size={15} /> Buat Undangan</button>
+			<div class="um-wrap">
+				<button class="user-chip" onclick={() => (userMenu = !userMenu)} aria-haspopup="true" aria-expanded={userMenu}>
+					<div class="avatar">AD</div>
+					<div class="user-meta">
+						<strong>Administrator</strong>
+						<span>Superuser</span>
+					</div>						<span class:chev-open={userMenu}><ChevronDown size={14} class="chev" /></span>
+				</button>
+				{#if userMenu}
+					<button class="um-backdrop" aria-label="Tutup" onclick={() => (userMenu = false)}></button>
+					<div class="user-menu">
+						<div class="um-head">
+							<div class="avatar lg">AD</div>
+							<div>
+								<strong>Administrator</strong>
+								<span>Panel Admin Undangan</span>
+							</div>
+						</div>
+						<button class="um-item" onclick={() => { window.open('/', '_blank'); userMenu = false; }}><ExternalLink size={14} /> Lihat Situs Undangan</button>
+						<div class="um-sep"></div>
+						<button class="um-item danger" onclick={logout}><LogOut size={14} /> Keluar</button>
+					</div>
+				{/if}
 			</div>
-			<button class="icon-btn" onclick={logout} title="Keluar"><LogOut size={17} /></button>
 		</div>
 	</header>
 
-	<div class="body">
+	<div class="body" class:rail={sidebarCollapsed}>
 		{#if sidebarOpen}<button class="side-overlay" aria-label="Tutup menu" onclick={() => (sidebarOpen = false)}></button>{/if}
 
-		<aside class="sidebar" class:open={sidebarOpen}>
+		<aside class="sidebar" class:open={sidebarOpen} class:rail={sidebarCollapsed}>
+			<p class="side-label">Menu Utama</p>
+			<nav class="side-nav">
+				<button class="active" onclick={closeDetail} title="Daftar Undangan">
+					<LayoutDashboard size={16} /><span class="nav-txt">Daftar Undangan</span>
+				</button>
+			</nav>
+
 			{#if selected}
-				<button class="side-back" onclick={closeDetail}><ArrowLeft size={15} /> Daftar Undangan</button>
+				<p class="side-label">Sedang Dikelola</p>
 				<div class="side-inv">
 					<div class="side-inv-mono">{initials(cur?.namaPihak1 ?? '', cur?.namaPihak2 ?? '')}</div>
 					<div class="side-inv-meta">
@@ -550,33 +621,28 @@
 						<span>{cur?.namaPihak1 || '?'} & {cur?.namaPihak2 || '?'}</span>
 					</div>
 				</div>
-				<p class="side-label">Kelola Undangan</p>
 				<nav class="side-nav">
-					<button class:active={tab === 'overview'} onclick={() => openDetail(selected!, 'overview')}><LayoutDashboard size={15} /> Ringkasan</button>
-					<button class:active={tab === 'tamu'} onclick={() => openDetail(selected!, 'tamu')}><Users size={15} /> Tamu {#if detailGuests.length}<span class="count">{detailGuests.length}</span>{/if}</button>
-					<button class:active={tab === 'ucapan'} onclick={() => openDetail(selected!, 'ucapan')}><MessageCircle size={15} /> Ucapan {#if detailWishes.length}<span class="count">{detailWishes.length}</span>{/if}</button>
-					<button class:active={tab === 'foto'} onclick={() => { tab = 'foto'; sidebarOpen = false; }}><ImageIcon size={15} /> Foto</button>
-					<button class:active={tab === 'konten'} onclick={() => { tab = 'konten'; sidebarOpen = false; }}><FileText size={15} /> Konten</button>
+					<a href={previewUrl(selected)} target="_blank" rel="noopener" title="Lihat Undangan"><ExternalLink size={15} /><span class="nav-txt">Lihat Undangan</span></a>
+					<a href={`/${selected}/kelola?pin=${encodeURIComponent(cur?.accessPin ?? '')}`} target="_blank" rel="noopener" title="Kelola Tamu"><Users size={15} /><span class="nav-txt">Kelola Tamu</span></a>
 				</nav>
-				<p class="side-label">Referensi</p>
-				<nav class="side-nav">
-					<a href={previewUrl(selected)} target="_blank" rel="noopener"><ExternalLink size={15} /> Lihat Undangan</a>
-					<a href={`/${selected}/kelola?pin=${encodeURIComponent(cur?.accessPin ?? '')}`} target="_blank" rel="noopener"><Users size={15} /> Kelola Tamu</a>
-				</nav>
-			{:else}
-				<p class="side-label">Menu Utama</p>
-				<nav class="side-nav">
-					<button class="active"><LayoutDashboard size={15} /> Daftar Undangan</button>
-				</nav>
-				<div class="side-stats">
-					<div class="stat"><strong>{items.length}</strong><span>Total</span></div>
-					<div class="stat"><strong>{items.filter((i) => i.status === 'active').length}</strong><span>Aktif</span></div>
-					<div class="stat"><strong>{items.filter((i) => i.status === 'draft').length}</strong><span>Draft</span></div>
-				</div>
-				<div class="side-foot">
-					<p>Subdomain & template dikelola di sini. Klik undangan untuk membuka detail & konten.</p>
-				</div>
 			{/if}
+
+			<div class="side-stats">
+				<div class="stat"><strong>{counts.all}</strong><span>Total</span></div>
+				<div class="stat"><strong>{counts.active}</strong><span>Aktif</span></div>
+				<div class="stat"><strong>{counts.draft}</strong><span>Draft</span></div>
+			</div>
+
+			<div class="side-foot">
+				<div class="sf-user">
+					<div class="avatar sm">AD</div>
+					<div class="sf-txt">
+						<strong>Administrator</strong>
+						<span>Superuser</span>
+					</div>
+				</div>
+				<button class="icon-btn dark" onclick={logout} title="Keluar"><LogOut size={15} /></button>
+			</div>
 		</aside>
 
 		<main class="main">
@@ -589,7 +655,7 @@
 					<span class="crumb-cur">{tabLabels[tab]}</span>
 				{:else}
 					<span class="crumb-sep">/</span>
-					<span>Daftar</span>
+					<span class="crumb-cur">Daftar</span>
 				{/if}
 			</nav>
 
@@ -602,80 +668,119 @@
 					<button class="btn btn-primary" onclick={openCreate}><Plus size={16} /> Buat Undangan</button>
 				</header>
 
-				<div class="kpis">
-					<div class="kpi">
-						<div class="kpi-ic" style="--c:#6366f1;--bg:#eef2ff"><FileText size={17} /></div>
-						<div><strong>{items.length}</strong><span>Total Undangan</span></div>
-					</div>
-					<div class="kpi">
-						<div class="kpi-ic" style="--c:#059669;--bg:#ecfdf5"><LayoutDashboard size={17} /></div>
-						<div><strong>{items.filter((i) => i.status === 'active').length}</strong><span>Aktif</span></div>
-					</div>
-					<div class="kpi">
-						<div class="kpi-ic" style="--c:#d97706;--bg:#fffbeb"><Edit3 size={17} /></div>
-						<div><strong>{items.filter((i) => i.status === 'draft').length}</strong><span>Draft</span></div>
-					</div>
-				</div>
-
 				{#if loading}
-					<div class="card pad"><p class="muted">Memuat…</p></div>
-				{:else if err}
-					<div class="alert err"><X size={15} /> {err}</div>
-				{:else if items.length === 0}
-					<div class="empty">
-						<strong>Belum ada undangan</strong>
-						<p>Buat undangan pertama dengan subdomain mis. <code>ruhaeni-roni</code>.</p>
+					<div class="kpis">
+						<div class="kpi sk"></div>
+						<div class="kpi sk"></div>
+						<div class="kpi sk"></div>
+						<div class="kpi sk"></div>
+					</div>
+					<div class="card table-wrap">
+						{#each [0, 1, 2, 3, 4] as i}
+							<div class="sk-row"><div class="sk sk-b" style="width:38%"></div><div class="sk sk-b" style="width:26%"></div><div class="sk sk-b" style="width:16%"></div></div>
+						{/each}
 					</div>
 				{:else}
-					<div class="card table-wrap">
-						<table>
-							<thead>
-								<tr>
-									<th>Subdomain / Link</th>
-									<th>Pasangan</th>
-									<th>Tanggal Acara</th>
-									<th>Status</th>
-									<th>PIN Kelola</th>
-									<th class="ta-r">Aksi</th>
-								</tr>
-							</thead>
-							<tbody>
-								{#each items as it}
-									<tr class:selected={selected === it.subdomain}>
-										<td>
-											<button class="lnk strong" onclick={() => openDetail(it.subdomain)}><code>{it.subdomain}</code></button>
-											<div class="links">
-												<a href={previewUrl(it.subdomain)} target="_blank" rel="noopener"><ExternalLink size={12} /> Lihat</a>
-												<button class="lnk" onclick={() => copy(`${location.origin}/${it.subdomain}`, it.subdomain)}>
-													{#if copied === it.subdomain}<Check size={12} /> Tersalin{:else}<Copy size={12} /> Salin Link{/if}
-												</button>
-											</div>
-										</td>
-										<td>
-											<div class="couple">
-												<span>{it.namaPihak1 || '—'} <i>&</i> {it.namaPihak2 || '—'}</span>
-												<span class="tag" title={templateMeta.find((t) => t.id === it.template)?.description}>{templateLabel(it.template)}</span>
-											</div>
-										</td>
-										<td>{formatDate(it.tanggalAcara)}</td>
-										<td>
-											<span class="pill" class:ok={it.status === 'active'} class:warn={it.status === 'draft'} class:muted-pill={it.status === 'expired'}>
-												<span class="dot"></span>{it.status}
-											</span>
-										</td>
-										<td><code class="pin">{it.accessPin ?? '—'}</code></td>
-										<td class="ta-r">
-											<div class="actions">
-												<button class="icon-btn sm" onclick={() => openEdit(it)} title="Edit"><Edit3 size={14} /></button>
-												<button class="icon-btn sm" onclick={() => openDetail(it.subdomain)} title="Detail"><Users size={14} /></button>
-												<button class="icon-btn sm danger" onclick={() => del(it.subdomain)} title="Hapus"><Trash2 size={14} /></button>
-											</div>
-										</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
+					<div class="kpis">
+						<div class="kpi">
+							<div class="kpi-ic" style="--c:#635bff;--bg:#eef0ff"><FileText size={17} /></div>
+							<div><strong>{counts.all}</strong><span>Total Undangan</span></div>
+						</div>
+						<div class="kpi">
+							<div class="kpi-ic" style="--c:#059669;--bg:#ecfdf5"><Check size={17} /></div>
+							<div><strong>{counts.active}</strong><span>Aktif</span></div>
+						</div>
+						<div class="kpi">
+							<div class="kpi-ic" style="--c:#d97706;--bg:#fffbeb"><Edit3 size={17} /></div>
+							<div><strong>{counts.draft}</strong><span>Draft</span></div>
+						</div>
+						<div class="kpi">
+							<div class="kpi-ic" style="--c:#64748b;--bg:#f1f5f9"><Trash2 size={17} /></div>
+							<div><strong>{counts.expired}</strong><span>Nonaktif</span></div>
+						</div>
 					</div>
+
+					{#if err}
+						<div class="alert err"><X size={15} /> {err}</div>
+					{:else if items.length === 0}
+						<div class="empty">
+							<strong>Belum ada undangan</strong>
+							<p>Buat undangan pertama dengan subdomain mis. <code>ruhaeni-roni</code>.</p>
+							<button class="btn btn-primary sm" onclick={openCreate}><Plus size={14} /> Buat Undangan</button>
+						</div>
+					{:else}
+						<div class="toolbar">
+							<div class="search-box">
+								<Search size={14} class="s-ic" />
+								<input type="text" placeholder="Cari subdomain atau nama pasangan…" bind:value={searchQ} />
+								{#if searchQ}<button class="s-clear" onclick={() => (searchQ = '')} aria-label="Bersihkan pencarian"><X size={13} /></button>{/if}
+							</div>
+							<div class="chips">
+								<button class:active={statusF === 'all'} onclick={() => (statusF = 'all')}>Semua <b>{counts.all}</b></button>
+								<button class:active={statusF === 'active'} onclick={() => (statusF = 'active')}>Aktif <b>{counts.active}</b></button>
+								<button class:active={statusF === 'draft'} onclick={() => (statusF = 'draft')}>Draft <b>{counts.draft}</b></button>
+								<button class:active={statusF === 'expired'} onclick={() => (statusF = 'expired')}>Nonaktif <b>{counts.expired}</b></button>
+							</div>
+						</div>
+
+						{#if filteredItems.length === 0}
+							<div class="empty">
+								<strong>Tidak ada hasil</strong>
+								<p>Tidak ada undangan yang cocok dengan pencarian atau filter.</p>
+								<button class="btn btn-ghost sm" onclick={() => { searchQ = ''; statusF = 'all'; }}><X size={14} /> Reset Filter</button>
+							</div>
+						{:else}
+							<div class="card table-wrap">
+								<table>
+									<thead>
+										<tr>
+											<th>Subdomain / Link</th>
+											<th>Pasangan</th>
+											<th>Tanggal Acara</th>
+											<th>Status</th>
+											<th>PIN Kelola</th>
+											<th class="ta-r">Aksi</th>
+										</tr>
+									</thead>
+									<tbody>
+										{#each filteredItems as it}
+											<tr class:selected={selected === it.subdomain}>
+												<td>
+													<button class="lnk strong" onclick={() => openDetail(it.subdomain)}><code>{it.subdomain}</code></button>
+													<div class="links">
+														<a href={previewUrl(it.subdomain)} target="_blank" rel="noopener"><ExternalLink size={12} /> Lihat</a>
+														<button class="lnk" onclick={() => copy(`${location.origin}/${it.subdomain}`, it.subdomain)}>
+															{#if copied === it.subdomain}<Check size={12} /> Tersalin{:else}<Copy size={12} /> Salin Link{/if}
+														</button>
+													</div>
+												</td>
+												<td>
+													<div class="couple">
+														<span>{it.namaPihak1 || '—'} <i>&</i> {it.namaPihak2 || '—'}</span>
+														<span class="tag" title={templateMeta.find((t) => t.id === it.template)?.description}>{templateLabel(it.template)}</span>
+													</div>
+												</td>
+												<td>{formatDate(it.tanggalAcara)}</td>
+												<td>
+													<span class="pill" class:ok={it.status === 'active'} class:warn={it.status === 'draft'} class:muted-pill={it.status === 'expired'}>
+														<span class="dot"></span>{it.status}
+													</span>
+												</td>
+												<td><code class="pin">{it.accessPin ?? '—'}</code></td>
+												<td class="ta-r">
+													<div class="actions">
+														<button class="icon-btn sm" onclick={() => openEdit(it)} title="Edit"><Edit3 size={14} /></button>
+														<button class="icon-btn sm" onclick={() => openDetail(it.subdomain)} title="Detail"><Users size={14} /></button>
+														<button class="icon-btn sm danger" onclick={() => del(it.subdomain)} title="Hapus"><Trash2 size={14} /></button>
+													</div>
+												</td>
+											</tr>
+										{/each}
+									</tbody>
+								</table>
+							</div>
+						{/if}
+					{/if}
 				{/if}
 			{/if}
 
@@ -696,11 +801,24 @@
 						<button class="btn btn-ghost" onclick={() => cur && openEdit(cur)}><Edit3 size={14} /> Edit</button>
 						<a class="btn btn-ghost" href={previewUrl(selected)} target="_blank" rel="noopener"><ExternalLink size={14} /> Lihat</a>
 						<a class="btn btn-ghost" href={`/${selected}/kelola?pin=${encodeURIComponent(cur?.accessPin ?? '')}`} target="_blank" rel="noopener"><Users size={14} /> Kelola Tamu</a>
+						<button class="icon-btn sm danger" onclick={() => del(selected!)} title="Hapus undangan"><Trash2 size={15} /></button>
 					</div>
 				</header>
 
+				<div class="tabsbar card">
+					<button class:active={tab === 'overview'} onclick={() => openDetail(selected!, 'overview')}><LayoutDashboard size={15} /> Ringkasan</button>
+					<button class:active={tab === 'tamu'} onclick={() => openDetail(selected!, 'tamu')}><Users size={15} /> Tamu {#if detailGuests.length}<span class="count">{detailGuests.length}</span>{/if}</button>
+					<button class:active={tab === 'ucapan'} onclick={() => openDetail(selected!, 'ucapan')}><MessageCircle size={15} /> Ucapan {#if detailWishes.length}<span class="count">{detailWishes.length}</span>{/if}</button>
+					<button class:active={tab === 'foto'} onclick={() => (tab = 'foto')}><ImageIcon size={15} /> Foto</button>
+					<button class:active={tab === 'konten'} onclick={() => (tab = 'konten')}><FileText size={15} /> Konten</button>
+				</div>
+
 				{#if detailLoading}
-					<div class="card pad"><p class="muted">Memuat…</p></div>
+					<div class="card pad">
+						{#each [0, 1, 2] as i}
+							<div class="sk sk-b" style="width:100%;height:14px;margin-bottom:0.7rem"></div>
+						{/each}
+					</div>
 				{:else if tab === 'overview'}
 					<div class="ov-cards">
 						<div class="ov-card"><strong>{detailGuests.length}</strong><span>Tamu</span></div>
@@ -965,9 +1083,6 @@
 		--warn-bg: #fffbeb;
 		--danger: #dc2626;
 		--danger-bg: #fef2f2;
-		--sidebar-bg: #101828;
-		--sidebar-ink: #98a2b3;
-		--sidebar-active: #ffffff;
 		--radius: 14px;
 		--shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 1px 3px rgba(16, 24, 40, 0.08);
 		--shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.16);
@@ -1000,28 +1115,39 @@
 	.topbar-left {
 		display: flex;
 		align-items: center;
-		gap: 0.6rem;
+		gap: 0.5rem;
+		min-width: 0;
 	}
-	.burger {
-		display: none;
+	.burger,
+	.collapse-btn {
 		width: 36px;
 		height: 36px;
+		flex: none;
 		border: 1px solid var(--line);
 		border-radius: 10px;
 		background: var(--card);
 		color: var(--ink-2);
 		cursor: pointer;
+		display: grid;
 		place-items: center;
+		transition: background 0.12s ease, color 0.12s ease;
 	}
-	.burger:hover {
+	.burger:hover,
+	.collapse-btn:hover {
+		background: var(--line-soft);
 		color: var(--ink);
+	}
+	.burger {
+		display: none;
 	}
 	.brand {
 		display: flex;
 		align-items: center;
 		gap: 0.6rem;
+		min-width: 0;
 	}
 	.logo-mark {
+		flex: none;
 		width: 34px;
 		height: 34px;
 		border-radius: 10px;
@@ -1038,6 +1164,7 @@
 		display: inline-flex;
 		align-items: baseline;
 		gap: 0.4em;
+		white-space: nowrap;
 	}
 	.brand-name em {
 		font-style: normal;
@@ -1050,19 +1177,33 @@
 	.topbar-right {
 		display: flex;
 		align-items: center;
-		gap: 0.6rem;
+		gap: 0.7rem;
+	}
+	.top-create {
+		white-space: nowrap;
+	}
+
+	/* ===== User menu ===== */
+	.um-wrap {
+		position: relative;
 	}
 	.user-chip {
 		display: flex;
 		align-items: center;
 		gap: 0.55rem;
-		padding: 0.25rem 0.5rem;
+		padding: 0.3rem 0.55rem;
 		border-radius: 12px;
+		border: 0;
+		background: transparent;
+		font-family: inherit;
+		cursor: pointer;
+		transition: background 0.12s ease;
 	}
 	.user-chip:hover {
 		background: var(--line-soft);
 	}
 	.avatar {
+		flex: none;
 		width: 32px;
 		height: 32px;
 		border-radius: 50%;
@@ -1073,9 +1214,20 @@
 		font-size: 12px;
 		font-weight: 700;
 	}
+	.avatar.lg {
+		width: 38px;
+		height: 38px;
+		font-size: 13px;
+	}
+	.avatar.sm {
+		width: 28px;
+		height: 28px;
+		font-size: 11px;
+	}
 	.user-meta {
 		display: grid;
 		line-height: 1.2;
+		text-align: left;
 	}
 	.user-meta strong {
 		font-size: 12.5px;
@@ -1085,6 +1237,93 @@
 		font-size: 11px;
 		color: var(--ink-3);
 	}
+	.chev {
+		color: var(--ink-3);
+		transition: transform 0.15s ease;
+		display: flex;
+	}
+	.chev-open .chev {
+		transform: rotate(180deg);
+	}
+	.um-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 44;
+		border: 0;
+		background: transparent;
+	}
+	.user-menu {
+		position: absolute;
+		right: 0;
+		top: calc(100% + 6px);
+		z-index: 45;
+		width: 240px;
+		background: var(--card);
+		border: 1px solid var(--line);
+		border-radius: 14px;
+		box-shadow: var(--shadow-lg);
+		padding: 0.5rem;
+		display: grid;
+		gap: 2px;
+		animation: pop-in 0.14s ease;
+	}
+	@keyframes pop-in {
+		from {
+			opacity: 0;
+			transform: translateY(-6px) scale(0.98);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0) scale(1);
+		}
+	}
+	.um-head {
+		display: flex;
+		align-items: center;
+		gap: 0.7rem;
+		padding: 0.6rem 0.6rem 0.7rem;
+		border-bottom: 1px solid var(--line-soft);
+		margin-bottom: 0.3rem;
+	}
+	.um-head strong {
+		display: block;
+		font-size: 13.5px;
+		color: var(--ink);
+	}
+	.um-head span {
+		font-size: 11.5px;
+		color: var(--ink-3);
+	}
+	.um-item {
+		display: flex;
+		align-items: center;
+		gap: 0.55em;
+		width: 100%;
+		border: 0;
+		background: transparent;
+		border-radius: 9px;
+		padding: 0.55em 0.7em;
+		font-size: 13px;
+		font-family: inherit;
+		color: var(--ink-2);
+		cursor: pointer;
+		text-align: left;
+	}
+	.um-item:hover {
+		background: var(--line-soft);
+		color: var(--ink);
+	}
+	.um-item.danger {
+		color: var(--danger);
+	}
+	.um-item.danger:hover {
+		background: var(--danger-bg);
+	}
+	.um-sep {
+		height: 1px;
+		background: var(--line-soft);
+		margin: 0.2rem 0;
+	}
 
 	/* ===== Body grid ===== */
 	.body {
@@ -1092,6 +1331,10 @@
 		grid-template-columns: 248px 1fr;
 		align-items: start;
 		min-height: calc(100svh - 60px);
+		transition: grid-template-columns 0.18s ease;
+	}
+	.body.rail {
+		grid-template-columns: 64px 1fr;
 	}
 	.sidebar {
 		position: sticky;
@@ -1113,6 +1356,9 @@
 		letter-spacing: 0.1em;
 		text-transform: uppercase;
 		color: #667085;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 	.side-nav {
 		display: grid;
@@ -1145,35 +1391,6 @@
 		background: linear-gradient(90deg, rgba(99, 91, 255, 0.28), rgba(99, 91, 255, 0.12));
 		color: var(--sidebar-active);
 		box-shadow: inset 3px 0 0 var(--accent);
-	}
-	.side-nav .count {
-		margin-left: auto;
-		font-size: 11px;
-		background: rgba(255, 255, 255, 0.12);
-		border-radius: 999px;
-		padding: 0.05em 0.55em;
-		color: #d0d5dd;
-	}
-	.side-nav button.active .count {
-		background: rgba(255, 255, 255, 0.22);
-		color: #fff;
-	}
-	.side-back {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.45em;
-		border: 1px solid rgba(255, 255, 255, 0.14);
-		background: rgba(255, 255, 255, 0.05);
-		border-radius: 10px;
-		padding: 0.5em 0.7em;
-		font-size: 12.5px;
-		font-family: inherit;
-		color: #d0d5dd;
-		cursor: pointer;
-	}
-	.side-back:hover {
-		background: rgba(255, 255, 255, 0.1);
-		color: #fff;
 	}
 	.side-inv {
 		display: flex;
@@ -1218,7 +1435,7 @@
 		display: grid;
 		grid-template-columns: repeat(3, 1fr);
 		gap: 0.4rem;
-		margin-top: 0.6rem;
+		margin-top: 0.4rem;
 	}
 	.stat {
 		display: grid;
@@ -1241,17 +1458,80 @@
 	}
 	.side-foot {
 		margin-top: auto;
-		padding: 0.6rem;
-		border-radius: 10px;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.4rem;
+		padding: 0.55rem 0.6rem;
+		border-radius: 12px;
 		background: rgba(255, 255, 255, 0.04);
+		border: 1px solid rgba(255, 255, 255, 0.07);
 	}
-	.side-foot p {
-		margin: 0;
-		font-size: 11.5px;
-		color: #667085;
+	.sf-user {
+		display: flex;
+		align-items: center;
+		gap: 0.55rem;
+		min-width: 0;
+	}
+	.sf-txt {
+		display: grid;
+		line-height: 1.2;
+		min-width: 0;
+	}
+	.sf-txt strong {
+		font-size: 12px;
+		color: #f2f4f7;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.sf-txt span {
+		font-size: 10.5px;
+		color: var(--sidebar-ink);
+	}
+	.icon-btn.dark {
+		flex: none;
+		width: 30px;
+		height: 30px;
+		border-radius: 8px;
+		border: 1px solid rgba(255, 255, 255, 0.14);
+		background: transparent;
+		color: var(--sidebar-ink);
+		display: grid;
+		place-items: center;
+		cursor: pointer;
+	}
+	.icon-btn.dark:hover {
+		background: rgba(255, 255, 255, 0.1);
+		color: #fff;
 	}
 	.side-overlay {
 		display: none;
+	}
+
+	/* ===== Rail (sidebar dicuitkan) ===== */
+	.sidebar.rail {
+		padding: 1.1rem 0.5rem;
+	}
+	.sidebar.rail .side-label,
+	.sidebar.rail .nav-txt,
+	.sidebar.rail .side-inv-meta,
+	.sidebar.rail .side-stats,
+	.sidebar.rail .sf-txt {
+		display: none;
+	}
+	.sidebar.rail .side-nav button,
+	.sidebar.rail .side-nav a {
+		justify-content: center;
+		padding: 0.6em 0;
+	}
+	.sidebar.rail .side-inv {
+		justify-content: center;
+		padding: 0.4rem 0;
+	}
+	.sidebar.rail .side-foot {
+		justify-content: center;
+		padding: 0.5rem 0;
 	}
 
 	/* ===== Main ===== */
@@ -1309,7 +1589,7 @@
 	/* ===== KPI ===== */
 	.kpis {
 		display: grid;
-		grid-template-columns: repeat(3, 1fr);
+		grid-template-columns: repeat(4, 1fr);
 		gap: 0.9rem;
 		margin-bottom: 1.2rem;
 	}
@@ -1339,10 +1619,97 @@
 		line-height: 1.15;
 	}
 	.kpi span {
-		font-size: 11.5px;
+		font-size: 11px;
 		color: var(--ink-3);
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
+	}
+
+	/* ===== Toolbar (cari + filter) ===== */
+	.toolbar {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.8rem;
+		flex-wrap: wrap;
+		margin-bottom: 1rem;
+	}
+	.search-box {
+		position: relative;
+		flex: 1;
+		min-width: 220px;
+		max-width: 380px;
+	}
+	.search-box input {
+		width: 100%;
+		border: 1px solid var(--line);
+		border-radius: 10px;
+		background: var(--card);
+		padding: 0.6em 2.2em 0.6em 2.3em;
+		font-size: 13px;
+		font-family: inherit;
+		color: var(--ink);
+	}
+	.search-box input:focus {
+		outline: 2px solid var(--accent);
+		outline-offset: -1px;
+		border-color: var(--accent);
+	}
+	:global(.s-ic) {
+		position: absolute;
+		left: 0.75rem;
+		top: 50%;
+		transform: translateY(-50%);
+		color: var(--ink-3);
+		pointer-events: none;
+	}
+	.s-clear {
+		position: absolute;
+		right: 0.5rem;
+		top: 50%;
+		transform: translateY(-50%);
+		width: 22px;
+		height: 22px;
+		border: 0;
+		border-radius: 6px;
+		background: var(--line-soft);
+		color: var(--ink-3);
+		cursor: pointer;
+		display: grid;
+		place-items: center;
+	}
+	.s-clear:hover {
+		color: var(--ink);
+	}
+	.chips {
+		display: flex;
+		gap: 0.35rem;
+		flex-wrap: wrap;
+	}
+	.chips button {
+		border: 1px solid var(--line);
+		background: var(--card);
+		color: var(--ink-2);
+		border-radius: 999px;
+		padding: 0.4em 0.85em;
+		font-size: 12px;
+		font-family: inherit;
+		cursor: pointer;
+		transition: all 0.13s ease;
+	}
+	.chips button:hover {
+		border-color: #d0d5dd;
+		color: var(--ink);
+	}
+	.chips button.active {
+		background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+		color: #fff;
+		border-color: transparent;
+		box-shadow: 0 1px 3px rgba(79, 70, 229, 0.35);
+	}
+	.chips b {
+		font-weight: 600;
+		opacity: 0.85;
 	}
 
 	/* ===== Card & table ===== */
@@ -1380,6 +1747,9 @@
 	}
 	tbody tr:last-child td {
 		border-bottom: 0;
+	}
+	tbody tr {
+		transition: background 0.1s ease;
 	}
 	tbody tr:hover {
 		background: #fafbff;
@@ -1509,6 +1879,7 @@
 		font-size: 13px;
 		font-weight: 600;
 		font-family: inherit;
+		letter-spacing: normal;
 		cursor: pointer;
 		border: 1px solid transparent;
 		transition: background 0.12s ease, box-shadow 0.12s ease, transform 0.05s ease;
@@ -1575,20 +1946,21 @@
 		cursor: not-allowed;
 	}
 
-	/* ===== Detail head ===== */
+	/* ===== Detail head & tabs ===== */
 	.detail-head {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
 		gap: 1rem;
 		padding: 1.1rem 1.2rem;
-		margin-bottom: 1.1rem;
+		margin-bottom: 0.8rem;
 		flex-wrap: wrap;
 	}
 	.dh-left {
 		display: flex;
 		align-items: center;
 		gap: 0.85rem;
+		min-width: 0;
 	}
 	.dh-mono {
 		flex: none;
@@ -1632,6 +2004,48 @@
 		display: flex;
 		gap: 0.5rem;
 		flex-wrap: wrap;
+		align-items: center;
+	}
+	.tabsbar {
+		display: flex;
+		gap: 2px;
+		padding: 0.35rem;
+		margin-bottom: 1.1rem;
+		overflow-x: auto;
+	}
+	.tabsbar button {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45em;
+		border: 0;
+		background: transparent;
+		border-radius: 9px;
+		padding: 0.5em 0.9em;
+		font-size: 13px;
+		font-weight: 500;
+		font-family: inherit;
+		color: var(--ink-2);
+		cursor: pointer;
+		white-space: nowrap;
+		transition: background 0.12s ease, color 0.12s ease;
+	}
+	.tabsbar button:hover {
+		background: var(--line-soft);
+		color: var(--ink);
+	}
+	.tabsbar button.active {
+		background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+		color: #fff;
+		box-shadow: 0 1px 3px rgba(79, 70, 229, 0.35);
+	}
+	.tabsbar .count {
+		font-size: 11px;
+		background: rgba(0, 0, 0, 0.07);
+		border-radius: 999px;
+		padding: 0.05em 0.5em;
+	}
+	.tabsbar button.active .count {
+		background: rgba(255, 255, 255, 0.22);
 	}
 
 	/* ===== Overview ===== */
@@ -1931,6 +2345,35 @@
 		}
 	}
 
+	/* ===== Skeleton ===== */
+	.sk {
+		border-radius: 10px;
+		background: linear-gradient(90deg, #eef0f3 25%, #f7f8fa 50%, #eef0f3 75%);
+		background-size: 200% 100%;
+		animation: sk 1.3s infinite linear;
+	}
+	.kpi.sk {
+		height: 68px;
+	}
+	.sk-row {
+		display: flex;
+		gap: 1.5rem;
+		align-items: center;
+		padding: 1rem 1.2rem;
+		border-bottom: 1px solid var(--line-soft);
+	}
+	.sk-row:last-child {
+		border-bottom: 0;
+	}
+	.sk-b {
+		height: 14px;
+	}
+	@keyframes sk {
+		to {
+			background-position: -200% 0;
+		}
+	}
+
 	/* ===== Modal ===== */
 	.modal {
 		position: fixed;
@@ -2059,30 +2502,46 @@
 		padding: 2.2rem 1.4rem;
 		text-align: center;
 		color: var(--ink-3);
+		display: grid;
+		gap: 0.4rem;
+		justify-content: center;
 	}
 	.empty strong {
 		display: block;
 		font-size: 15px;
 		color: var(--ink-2);
-		margin-bottom: 0.25rem;
 	}
 	.empty p {
 		margin: 0;
 		font-size: 13px;
+	}
+	.empty .btn {
+		justify-self: center;
+		margin-top: 0.4rem;
 	}
 	.muted {
 		color: var(--ink-3);
 	}
 
 	/* ===== Responsive ===== */
+	@media (max-width: 1080px) {
+		.kpis {
+			grid-template-columns: repeat(2, 1fr);
+		}
+	}
 	@media (max-width: 960px) {
-		.body {
+		.body,
+		.body.rail {
 			grid-template-columns: 1fr;
+		}
+		.collapse-btn {
+			display: none;
 		}
 		.burger {
 			display: grid;
 		}
-		.sidebar {
+		.sidebar,
+		.sidebar.rail {
 			position: fixed;
 			top: 60px;
 			bottom: 0;
@@ -2093,9 +2552,22 @@
 			transform: translateX(-100%);
 			transition: transform 0.2s ease;
 			overflow-y: auto;
+			padding: 1.1rem 0.9rem;
 		}
 		.sidebar.open {
 			transform: translateX(0);
+		}
+		.sidebar.rail .side-label,
+		.sidebar.rail .nav-txt,
+		.sidebar.rail .side-inv-meta,
+		.sidebar.rail .side-stats,
+		.sidebar.rail .sf-txt {
+			display: revert;
+		}
+		.sidebar.rail .side-nav button,
+		.sidebar.rail .side-nav a {
+			justify-content: flex-start;
+			padding: 0.55em 0.7em;
 		}
 		.side-overlay {
 			display: block;
@@ -2110,7 +2582,8 @@
 		}
 	}
 	@media (max-width: 720px) {
-		.user-meta {
+		.user-meta,
+		.top-create {
 			display: none;
 		}
 		.kpis,
@@ -2123,6 +2596,12 @@
 		}
 		.konten-savebar {
 			position: static;
+		}
+		.toolbar {
+			align-items: stretch;
+		}
+		.search-box {
+			max-width: none;
 		}
 	}
 </style>
