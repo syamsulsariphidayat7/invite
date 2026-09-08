@@ -15,7 +15,11 @@
 		Circle,
 		SlidersHorizontal,
 		RotateCcw,
-		Lock
+		Lock,
+		LogOut,
+		ExternalLink,
+		X,
+		ArrowLeft
 	} from 'lucide-svelte';
 
 	let { data } = $props();
@@ -43,6 +47,14 @@
 	let loading = $state(false);
 	let pinChecking = $state(false);
 	let selectedIds = $state<Set<string>>(new Set());
+
+	let toast = $state<{ msg: string; type: 'ok' | 'err' } | null>(null);
+	let toastTimer: ReturnType<typeof setTimeout> | null = null;
+	function notify(msg: string, type: 'ok' | 'err' = 'ok') {
+		toast = { msg, type };
+		if (toastTimer) clearTimeout(toastTimer);
+		toastTimer = setTimeout(() => (toast = null), 2800);
+	}
 
 	const DEFAULT_TEMPLATE = `Halo {nama}, kamu diundang ke pernikahan Ruhaeni & Asep Roni 💍\n\nBuka undangannya di sini ya:\n{link}\n\nMohon doa & kehadirannya 🙏`;
 	let serverTemplate = $state<string | null>(null);
@@ -106,6 +118,7 @@
 			guests = (j.guests ?? []).map((g: GuestRow) => ({ id: g.id, name: g.name, sent: g.sent, sentAt: g.sentAt }));
 			authed = true;
 			pinError = '';
+			notify(`Masuk sebagai pengelola ${slug}.`);
 			try {
 				sessionStorage.setItem(STORAGE_PIN, pin);
 				localStorage.setItem(STORAGE_PIN, pin);
@@ -122,6 +135,7 @@
 		authed = false;
 		pin = '';
 		pinError = '';
+		selectedIds = new Set();
 		try {
 			sessionStorage.removeItem(STORAGE_PIN);
 			localStorage.removeItem(STORAGE_PIN);
@@ -148,12 +162,17 @@
 				headers: { 'content-type': 'application/json', ...headers() },
 				body: JSON.stringify({ id: g.id, sent })
 			});
-			if (!res.ok) return;
+			if (!res.ok) {
+				notify('Gagal memperbarui status.', 'err');
+				return;
+			}
 			const j = await res.json();
 			g.sent = j.guest.sent;
 			g.sentAt = j.guest.sentAt;
 			guests = [...guests];
-		} catch {}
+		} catch {
+			notify('Gagal memperbarui status.', 'err');
+		}
 	}
 
 	function handleSendWa(g: GuestRow) {
@@ -191,15 +210,16 @@
 			});
 			if (!res.ok) {
 				const j = await res.json().catch(() => null);
-				alert(j?.message ?? 'Gagal menambah tamu.');
+				notify(j?.message ?? 'Gagal menambah tamu.', 'err');
 				return;
 			}
 			const j = await res.json();
 			const added: GuestRow[] = (j.added ?? []).map((g: GuestRow) => ({ id: g.id, name: g.name, sent: g.sent, sentAt: g.sentAt }));
 			if (added.length === 0) {
-				alert('Nama sudah ada.');
+				notify('Nama sudah ada.', 'err');
 			} else {
 				guests = [...guests, ...added];
+				notify(`${added.length} tamu ditambahkan.`);
 			}
 			single = '';
 		} finally {
@@ -219,14 +239,16 @@
 			});
 			if (!res.ok) {
 				const j = await res.json().catch(() => null);
-				alert(j?.message ?? 'Gagal import.');
+				notify(j?.message ?? 'Gagal import.', 'err');
 				return;
 			}
 			const j = await res.json();
 			const added: GuestRow[] = (j.added ?? []).map((g: GuestRow) => ({ id: g.id, name: g.name, sent: g.sent, sentAt: g.sentAt }));
 			guests = [...guests, ...added];
 			if (added.length < lines.length) {
-				alert(`${added.length} ditambahkan, ${lines.length - added.length} duplikat dilewati.`);
+				notify(`${added.length} ditambahkan, ${lines.length - added.length} duplikat dilewati.`, 'err');
+			} else {
+				notify(`${added.length} tamu diimport.`);
 			}
 			bulk = '';
 		} finally {
@@ -235,30 +257,37 @@
 	}
 
 	async function removeRow(g: GuestRow) {
-		if (!confirm(`Hapus "${g.name}"?`)) return;
-		const res = await fetch(apiUrl(`&id=${encodeURIComponent(g.id)}`), {
+		if (!confirm(`Hapus "${g.name}" dari daftar?`)) return;
+		const res = await fetch(apiUrl('', `&id=${encodeURIComponent(g.id)}`), {
 			method: 'DELETE',
 			headers: headers()
 		});
 		if (!res.ok) {
-			alert('Gagal menghapus.');
+			const j = await res.json().catch(() => null);
+			notify(j?.message ?? 'Gagal menghapus.', 'err');
 			return;
 		}
 		guests = guests.filter((x) => x.id !== g.id);
+		selectedIds.delete(g.id);
+		notify(`"${g.name}" dihapus.`);
 	}
 
 	async function clearAll() {
-		if (!confirm(`Hapus ${guests.length} tamu?`)) return;
-		const res = await fetch(apiUrl('&all=1'), { method: 'DELETE', headers: headers() });
+		if (!confirm(`Hapus ${guests.length} tamu dari daftar?`)) return;
+		const res = await fetch(apiUrl('', '&all=1'), { method: 'DELETE', headers: headers() });
 		if (!res.ok) {
-			alert('Gagal menghapus semua.');
+			const j = await res.json().catch(() => null);
+			notify(j?.message ?? 'Gagal menghapus semua.', 'err');
 			return;
 		}
 		guests = [];
+		selectedIds = new Set();
+		notify('Semua tamu dihapus.');
 	}
 
 	function resetTemplate() {
 		template = DEFAULT_TEMPLATE;
+		notify('Template dikembalikan ke default.');
 	}
 
 	function toggleSelect(id: string) {
@@ -289,19 +318,27 @@
 		const txt = selectedLinksText();
 		if (!txt) return;
 		await copy(txt, 'bulk-links');
+		notify('Link terpilih disalin.');
 	}
 	async function openSelectedWa() {
-		for (const g of guests.filter((x) => selectedIds.has(x.id))) {
+		const sel = guests.filter((x) => selectedIds.has(x.id));
+		for (const g of sel) {
 			window.open(waLink(g.name), '_blank');
 			await new Promise((r) => setTimeout(r, 280));
 			patchSent(g, true);
 		}
+		if (sel.length > 0) notify(`${sel.length} undangan WA dibuka.`);
 	}
 	async function markSelectedSent(sent: boolean) {
+		let changed = 0;
 		for (const id of selectedIds) {
 			const g = guests.find((x) => x.id === id);
-			if (g && g.sent !== sent) await patchSent(g, sent);
+			if (g && g.sent !== sent) {
+				await patchSent(g, sent);
+				changed++;
+			}
 		}
+		if (changed > 0) notify(`${changed} tamu ditandai ${sent ? 'terkirim' : 'belum terkirim'}.`);
 	}
 
 	const filteredGuests = $derived(
@@ -325,21 +362,38 @@
 	<title>Kelola Tamu — {slug}</title>
 </svelte:head>
 
-<div class="tamu">
-	<div class="wrap">
-		<header class="head">
-			<p class="kicker">Tamu Undangan</p>
-			<h1>Kelola Tamu — {slug}</h1>
-			<p class="desc">
-				Masuk dengan PIN untuk mengelola daftar tamu <code>/{slug}</code>. Tambah nama, salin link <code>?to=Nama</code>, kirim WA, dan tandai terkirim — tersinkron lintas device.
-			</p>
-		</header>
+<div class="shell">
+	<header class="topbar">
+		<div class="brand">
+			<div class="logo-mark">
+				<Users size={16} />
+			</div>
+			<span class="brand-name">Kelola Tamu<em>/{slug}</em></span>
+		</div>
+		<div class="topbar-right">
+			<a class="btn btn-ghost sm" href="/{slug}" target="_blank" rel="noopener"><ExternalLink size={14} /> Lihat Undangan</a>
+			{#if authed}
+				<button class="icon-btn" onclick={logout} title="Keluar"><LogOut size={16} /></button>
+			{/if}
+		</div>
+	</header>
+
+	<main class="main">
+		<nav class="crumb">
+			<span class="crumb-cur">Undangan</span>
+			<span class="crumb-sep">/</span>
+			<a class="crumb-link" href="/{slug}">{slug}</a>
+			<span class="crumb-sep">/</span>
+			<span class="crumb-cur">Kelola Tamu</span>
+		</nav>
 
 		{#if !authed}
-			<div class="card pin-card">
-				<label>
-					<span><Lock size={13} /> PIN Akses</span>
-					<div class="row">
+			<div class="pin-wrap">
+				<div class="card pin-card">
+					<div class="pin-ic"><Lock size={20} /></div>
+					<h1>Masuk dengan PIN</h1>
+					<p class="pin-desc">Masukkan PIN pengelola untuk mengelola daftar tamu <code>/{slug}</code>.</p>
+					<label class="pin-field">
 						<input
 							type="password"
 							inputmode="numeric"
@@ -347,75 +401,95 @@
 							bind:value={pin}
 							onkeydown={(e) => e.key === 'Enter' && tryVerify()}
 						/>
-						<button class="btn btn-green" onclick={tryVerify} disabled={pinChecking}>
-							{pinChecking ? 'Memeriksa…' : 'Masuk'}
-						</button>
-					</div>
-				</label>
-				{#if pinError}
-					<p class="pin-err">{pinError}</p>
-				{/if}
-				<p class="pin-hint">
-					Admin: set <code>access_pin</code> di tabel <code>invitations</code> untuk <code>{slug}</code>. Jika kosong, gunakan PIN <code>000000</code> (dev). PIN tersimpan 24 jam di device ini.
-				</p>
-				<a class="back" href="/{slug}">← Kembali ke undangan</a>
+					</label>
+					{#if pinError}
+						<p class="alert err"><X size={14} /> {pinError}</p>
+					{/if}
+					<button class="btn btn-primary" onclick={tryVerify} disabled={pinChecking}>
+						{pinChecking ? 'Memeriksa…' : 'Masuk'}
+					</button>
+					<p class="pin-hint">
+						PIN disimpan 24 jam di perangkat ini. Admin mengatur PIN di panel admin → kolom <em>PIN Kelola</em>. Jika kosong, gunakan <code>000000</code> (dev).
+					</p>
+				</div>
 			</div>
 		{:else}
-			<div class="card">
-				<div class="pin-bar">
-					<span class="pin-ok">Terautentikasi sebagai kelola <code>/{slug}</code></span>
-					<button class="btn-ghost sm" onclick={logout}>Keluar</button>
+			<header class="page-head">
+				<div>
+					<h1>Kelola Tamu</h1>
+					<p>Tambah nama, salin link undangan, kirim WA, dan tandai terkirim — tersinkron lintas device.</p>
+				</div>
+				<a class="btn btn-ghost" href="/{slug}" target="_blank" rel="noopener"><ExternalLink size={14} /> Buka Undangan</a>
+			</header>
+
+			<div class="kpis">
+				<div class="kpi">
+					<div class="kpi-ic" style="--c:#635bff;--bg:#eef0ff"><Users size={16} /></div>
+					<div><strong>{stats.total}</strong><span>Total Tamu</span></div>
+				</div>
+				<div class="kpi">
+					<div class="kpi-ic" style="--c:#059669;--bg:#ecfdf5"><CheckCircle2 size={16} /></div>
+					<div><strong>{stats.sent}</strong><span>Sudah Dikirim</span></div>
+				</div>
+				<div class="kpi">
+					<div class="kpi-ic" style="--c:#d97706;--bg:#fffbeb"><Circle size={16} /></div>
+					<div><strong>{stats.pending}</strong><span>Belum Dikirim</span></div>
+				</div>
+			</div>
+
+			<div class="card pad form-card">
+				<input type="text" bind:value={honey} tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;pointer-events:none;" />
+				<div class="f-row">
+					<label>
+						<span>Tambahkan satu tamu</span>
+						<div class="row">
+							<input
+								placeholder="Nama tamu, mis. Bapak Budi / Siti & Keluarga"
+								bind:value={single}
+								onkeydown={(e) => e.key === 'Enter' && addSingle()}
+								disabled={loading}
+							/>
+							<button class="btn btn-primary" onclick={addSingle} disabled={loading}>
+								<UserPlus size={15} /> Tambah
+							</button>
+						</div>
+					</label>
+					<label>
+						<span>Import banyak sekaligus (satu nama per baris)</span>
+						<div class="row bulk-row">
+							<textarea
+								rows="3"
+								placeholder="Budi Santoso&#10;Siti & Keluarga&#10;Kak Andi & Partner"
+								bind:value={bulk}
+								disabled={loading}
+							></textarea>
+							<button class="btn btn-ghost" onclick={addBulk} disabled={loading}>
+								<Upload size={15} /> Import Nama
+							</button>
+						</div>
+					</label>
 				</div>
 
-				<input type="text" bind:value={honey} tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;pointer-events:none;" />
-				<label>
-					<span><UserPlus size={13} /> Tambah satu tamu</span>
-					<div class="row">
-						<input
-							placeholder="Nama tamu, mis. Bapak Budi / Siti & Keluarga"
-							bind:value={single}
-							onkeydown={(e) => e.key === 'Enter' && addSingle()}
-							disabled={loading}
-						/>
-						<button class="btn btn-green" onclick={addSingle} disabled={loading}>
-							<UserPlus size={15} /> Tambah
-						</button>
-					</div>
-				</label>
-
-				<label>
-					<span><Upload size={13} /> Import banyak sekaligus (satu nama per baris)</span>
-					<textarea
-						rows="3"
-						placeholder="Budi Santoso&#10;Siti & Keluarga&#10;Kak Andi & Partner"
-						bind:value={bulk}
-						disabled={loading}
-					></textarea>
-					<button class="btn btn-ghost" onclick={addBulk} disabled={loading}>
-						<Upload size={15} /> Import Nama
-					</button>
-				</label>
-
-				<div class="template-toggle">
+				<div class="template-area">
 					<button type="button" class="btn-text" onclick={() => (showTemplate = !showTemplate)}>
 						<SlidersHorizontal size={13} />
 						{showTemplate ? 'Tutup Pengaturan Pesan WA' : 'Ubah Format Pesan WhatsApp'}
 					</button>
-				</div>
 
-				{#if showTemplate}
-					<div class="template-box">
-						<label>
-							<span>Format Pesan WA (Gunakan <code>{'{nama}'}</code> dan <code>{'{link}'}</code>)</span>
-							<textarea rows="4" bind:value={template}></textarea>
-						</label>
-						<div class="tmpl-actions">
-							<button type="button" class="btn-subtle" onclick={resetTemplate}>
-								<RotateCcw size={12} /> Reset ke Pesan Default
-							</button>
+					{#if showTemplate}
+						<div class="template-box">
+							<label>
+								<span>Format Pesan WA (gunakan <code>{'{nama}'}</code> dan <code>{'{link}'}</code>)</span>
+								<textarea rows="4" bind:value={template}></textarea>
+							</label>
+							<div class="tmpl-actions">
+								<button type="button" class="btn-subtle" onclick={resetTemplate}>
+									<RotateCcw size={12} /> Reset ke Pesan Default
+								</button>
+							</div>
 						</div>
-					</div>
-				{/if}
+					{/if}
+				</div>
 			</div>
 
 			<div class="filter-bar">
@@ -442,7 +516,7 @@
 					{#if selectedIds.size > 0}
 						<span class="bulk-count">{selectedIds.size} dipilih</span>
 						<button class="btn btn-ghost sm" onclick={copySelectedLinks}>Salin Link ({selectedIds.size})</button>
-						<button class="btn btn-green sm" onclick={openSelectedWa}>Kirim WA ({selectedIds.size})</button>
+						<button class="btn btn-primary sm" onclick={openSelectedWa}>Kirim WA ({selectedIds.size})</button>
 						<button class="btn btn-ghost sm" onclick={() => markSelectedSent(true)}>Tandai terkirim</button>
 						<button class="btn btn-ghost sm" onclick={clearSelection}>Batal</button>
 					{/if}
@@ -453,8 +527,10 @@
 				{#if filteredGuests.length === 0}
 					<div class="empty">
 						{#if guests.length === 0}
-							<p>Belum ada tamu. Tambahkan nama di form atas.</p>
+							<strong>Belum ada tamu</strong>
+							<p>Tambahkan nama di form atas.</p>
 						{:else}
+							<strong>Tidak ada hasil</strong>
 							<p>Tidak ada tamu yang cocok dengan filter atau pencarian.</p>
 						{/if}
 					</div>
@@ -478,8 +554,9 @@
 							</button>
 							<div class="info">
 								<div class="name-row">
+									<div class="li-avatar">{(g.name || '?')[0].toUpperCase()}</div>
 									<strong>{g.name}</strong>
-									{#if g.sent}<span class="sent-tag">Terkirim</span>{/if}
+									{#if g.sent}<span class="pill ok"><span class="dot"></span>Terkirim</span>{/if}
 								</div>
 								<a class="link" href={linkFor(g.name)} target="_blank" rel="noopener">
 									<Link2 size={12} /> {linkFor(g.name)}
@@ -487,16 +564,16 @@
 							</div>
 							<div class="actions">
 								<button
-									class="ic"
+									class="icon-btn"
 									class:ok={copied === `copy-${g.id}`}
 									onclick={() => copy(linkFor(g.name), `copy-${g.id}`)}
 									aria-label="Salin link"
 									title="Salin Link Undangan"
 								>
-									{#if copied === `copy-${g.id}`}<Check size={16} />{:else}<Copy size={16} />{/if}
+									{#if copied === `copy-${g.id}`}<Check size={15} />{:else}<Copy size={15} />{/if}
 								</button>
 								<a
-									class="ic wa"
+									class="icon-btn wa"
 									href={waLink(g.name)}
 									target="_blank"
 									rel="noopener"
@@ -504,10 +581,10 @@
 									aria-label="Kirim WA"
 									title="Kirim ke WhatsApp"
 								>
-									<Send size={16} />
+									<Send size={15} />
 								</a>
-								<button class="ic del" onclick={() => removeRow(g)} aria-label="Hapus" title="Hapus dari daftar">
-									<Trash2 size={16} />
+								<button class="icon-btn danger" onclick={() => removeRow(g)} aria-label="Hapus" title="Hapus dari daftar">
+									<Trash2 size={15} />
 								</button>
 							</div>
 						</article>
@@ -517,84 +594,251 @@
 
 			{#if guests.length > 0}
 				<div class="bottom-actions">
-					<button class="danger" onclick={clearAll}>
+					<button class="btn danger-ghost sm" onclick={clearAll}>
 						<Trash2 size={13} /> Hapus Semua Daftar ({guests.length})
 					</button>
 				</div>
 			{/if}
 
-			<a class="back" href="/{slug}">← Kembali ke undangan</a>
+			<a class="back" href="/{slug}"><ArrowLeft size={14} /> Kembali ke undangan</a>
 		{/if}
-	</div>
+	</main>
+
+	{#if toast}
+		<div class="toast" class:err={toast.type === 'err'} role="status">
+			{#if toast.type === 'err'}<X size={15} />{:else}<Check size={15} />{/if}
+			{toast.msg}
+		</div>
+	{/if}
 </div>
 
 <style>
-	.tamu {
+	/* ===== Design tokens (konsisten dengan panel admin) ===== */
+	.shell {
+		--bg: #f4f5f7;
+		--card: #ffffff;
+		--line: #e4e7ec;
+		--line-soft: #eef0f3;
+		--ink: #101828;
+		--ink-2: #475467;
+		--ink-3: #98a2b3;
+		--accent: #635bff;
+		--accent-strong: #4f46e5;
+		--accent-soft: #eef0ff;
+		--ok: #059669;
+		--ok-bg: #ecfdf5;
+		--warn: #d97706;
+		--danger: #dc2626;
+		--danger-bg: #fef2f2;
+		--radius: 14px;
+		--shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 1px 3px rgba(16, 24, 40, 0.08);
+		--shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.16);
+
 		min-height: 100svh;
-		background: var(--paper);
-		padding: 2.5rem 0 4rem;
-	}
-	.head {
-		text-align: center;
-		margin-bottom: 1.8rem;
-	}
-	.head h1 {
-		margin: 0.3rem 0 0.4rem;
-		font-family: var(--font-serif);
-		font-size: clamp(26px, 6vw, 34px);
+		background: var(--bg);
+		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 		color: var(--ink);
+		font-size: 14px;
+		line-height: 1.5;
 	}
-	.desc {
-		margin: 0 auto;
-		max-width: 36em;
-		font-size: 13.5px;
+	.shell * {
+		box-sizing: border-box;
+	}
+
+	/* ===== Topbar ===== */
+	.topbar {
+		position: sticky;
+		top: 0;
+		z-index: 40;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		height: 60px;
+		padding: 0 1.1rem;
+		background: var(--card);
+		border-bottom: 1px solid var(--line);
+	}
+	.brand {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+	}
+	.logo-mark {
+		width: 34px;
+		height: 34px;
+		border-radius: 10px;
+		display: grid;
+		place-items: center;
+		color: #fff;
+		background: linear-gradient(135deg, var(--accent), #8b5cf6);
+		box-shadow: 0 2px 6px rgba(99, 91, 255, 0.35);
+	}
+	.brand-name {
+		font-weight: 700;
+		font-size: 15px;
+		color: var(--ink);
+		display: inline-flex;
+		align-items: baseline;
+		gap: 0.4em;
+	}
+	.brand-name em {
+		font-style: normal;
+		font-size: 11.5px;
+		font-weight: 600;
+		color: var(--ink-3);
+		letter-spacing: 0.04em;
+	}
+	.topbar-right {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	/* ===== Main ===== */
+	.main {
+		padding: 1.3rem 1.5rem 4rem;
+		min-width: 0;
+		max-width: 960px;
+		margin-inline: auto;
+	}
+	.crumb {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 12.5px;
+		color: var(--ink-3);
+		margin-bottom: 1rem;
+	}
+	.crumb .crumb-cur {
 		color: var(--ink-2);
-		line-height: 1.7;
+		font-weight: 500;
 	}
-	.desc code {
+	.crumb-link {
+		border: 0;
+		background: transparent;
+		color: var(--ink-2);
+		font-size: 12.5px;
+		font-family: inherit;
+		cursor: pointer;
+		padding: 0;
+		text-decoration: none;
+	}
+	.crumb-link:hover {
+		color: var(--accent-strong);
+	}
+	.crumb .crumb-sep {
+		color: var(--ink-3);
+	}
+
+	/* ===== Page head & KPI ===== */
+	.page-head {
+		display: flex;
+		align-items: flex-end;
+		justify-content: space-between;
+		gap: 1rem;
+		margin-bottom: 1.2rem;
+		flex-wrap: wrap;
+	}
+	.page-head h1 {
+		margin: 0 0 0.15rem;
+		font-size: 22px;
+		font-weight: 700;
+		letter-spacing: -0.01em;
+	}
+	.page-head p {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-2);
+	}
+	.kpis {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 0.9rem;
+		margin-bottom: 1.2rem;
+	}
+	.kpi {
+		display: flex;
+		align-items: center;
+		gap: 0.8rem;
 		background: var(--card);
 		border: 1px solid var(--line);
-		border-radius: 6px;
-		padding: 0.1em 0.35em;
-		font-size: 12px;
+		border-radius: var(--radius);
+		padding: 0.9rem 1rem;
+		box-shadow: var(--shadow);
 	}
+	.kpi-ic {
+		flex: none;
+		width: 40px;
+		height: 40px;
+		border-radius: 11px;
+		display: grid;
+		place-items: center;
+		color: var(--c);
+		background: var(--bg);
+	}
+	.kpi strong {
+		display: block;
+		font-size: 20px;
+		line-height: 1.15;
+	}
+	.kpi span {
+		font-size: 11.5px;
+		color: var(--ink-3);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	/* ===== Card & form ===== */
 	.card {
 		background: var(--card);
 		border: 1px solid var(--line);
-		border-radius: 20px;
-		padding: 1.4rem;
+		border-radius: var(--radius);
+		box-shadow: var(--shadow);
+	}
+	.card.pad {
+		padding: 1.2rem;
+	}
+	.form-card {
 		display: grid;
-		gap: 1.1rem;
-		box-shadow: var(--shadow-1);
-		margin-bottom: 1.4rem;
+		gap: 1rem;
+		margin-bottom: 1.2rem;
 	}
-	.pin-card {
-		max-width: 480px;
-		margin-inline: auto;
+	.f-row {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 1rem;
 	}
-	.card label span {
+	.form-card label span {
 		display: flex;
 		align-items: center;
 		gap: 0.4em;
-		font-size: 12px;
+		font-size: 11px;
 		font-weight: 600;
 		letter-spacing: 0.06em;
 		text-transform: uppercase;
-		color: var(--ink-2);
-		margin-bottom: 0.45rem;
+		color: var(--ink-3);
+		margin-bottom: 0.35rem;
 	}
 	.row {
 		display: grid;
 		grid-template-columns: 1fr auto;
 		gap: 0.6rem;
 	}
+	.bulk-row {
+		grid-template-columns: 1fr;
+		align-items: stretch;
+	}
+	.bulk-row .btn {
+		justify-self: start;
+	}
 	input,
 	textarea {
 		width: 100%;
 		border: 1px solid var(--line);
-		border-radius: 12px;
+		border-radius: 10px;
 		background: #fff;
-		padding: 0.7em 0.9em;
+		padding: 0.65em 0.9em;
 		font-family: inherit;
 		font-size: 14px;
 		color: var(--ink);
@@ -602,51 +846,17 @@
 	}
 	input:focus,
 	textarea:focus {
-		outline: none;
-		border-color: var(--gold-2);
-		box-shadow: 0 0 0 3px rgba(107, 107, 107, 0.14);
+		outline: 2px solid var(--accent);
+		outline-offset: -1px;
+		border-color: var(--accent);
 	}
-	.pin-err {
-		margin: 0;
-		font-size: 13px;
-		color: #b91c1c;
-		background: #fef2f2;
-		border: 1px solid #fecaca;
-		border-radius: 10px;
-		padding: 0.6em 0.9em;
-	}
-	.pin-hint {
-		margin: 0;
-		font-size: 12.5px;
-		color: var(--ink-3);
-		line-height: 1.6;
-	}
-	.pin-bar {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 0.6rem;
-		background: #f0fdf4;
-		border: 1px solid #bbf7d0;
-		border-radius: 12px;
-		padding: 0.6em 0.9em;
-	}
-	.pin-ok {
-		font-size: 12.5px;
-		color: #065f46;
-	}
-	.btn-ghost.sm {
-		padding: 0.3em 0.8em;
-		font-size: 12px;
-		border-radius: 999px;
-		border: 1px solid #bbf7d0;
-		background: #fff;
-		color: #065f46;
-		cursor: pointer;
-	}
-	.template-toggle {
+
+	/* ===== Template WA ===== */
+	.template-area {
 		border-top: 1px dashed var(--line);
 		padding-top: 0.8rem;
+		display: grid;
+		gap: 0.6rem;
 	}
 	.btn-text {
 		background: transparent;
@@ -654,20 +864,21 @@
 		color: var(--ink-2);
 		font-size: 13px;
 		font-weight: 500;
+		font-family: inherit;
 		cursor: pointer;
 		display: inline-flex;
 		align-items: center;
 		gap: 0.45em;
 		padding: 0;
+		justify-self: start;
 	}
 	.btn-text:hover {
-		color: var(--ink);
-		text-decoration: underline;
+		color: var(--accent-strong);
 	}
 	.template-box {
-		background: var(--paper);
+		background: var(--bg);
 		border: 1px solid var(--line);
-		border-radius: 14px;
+		border-radius: 12px;
 		padding: 1rem;
 		display: grid;
 		gap: 0.6rem;
@@ -688,6 +899,7 @@
 		border: 0;
 		color: var(--ink-3);
 		font-size: 12px;
+		font-family: inherit;
 		cursor: pointer;
 		display: inline-flex;
 		align-items: center;
@@ -696,10 +908,14 @@
 	.btn-subtle:hover {
 		color: var(--ink-2);
 	}
+
+	/* ===== Filter bar ===== */
 	.filter-bar {
 		display: grid;
+		grid-template-columns: 1fr minmax(200px, 280px);
 		gap: 0.8rem;
-		margin-bottom: 1.1rem;
+		align-items: center;
+		margin-bottom: 1rem;
 	}
 	.tabs {
 		display: flex;
@@ -712,16 +928,25 @@
 		background: var(--card);
 		color: var(--ink-2);
 		border-radius: 999px;
-		padding: 0.45em 0.9em;
+		padding: 0.45em 0.95em;
 		font-size: 12.5px;
+		font-family: inherit;
 		cursor: pointer;
 		white-space: nowrap;
-		transition: all 0.2s ease;
+		transition: all 0.15s ease;
+	}
+	.tabs button:hover {
+		border-color: #d0d5dd;
+		color: var(--ink);
 	}
 	.tabs button.active {
-		background: var(--ink);
+		background: linear-gradient(135deg, var(--accent), var(--accent-strong));
 		color: #fff;
-		border-color: var(--ink);
+		border-color: transparent;
+		box-shadow: 0 1px 3px rgba(79, 70, 229, 0.35);
+	}
+	.tabs b {
+		font-weight: 600;
 	}
 	.search-box {
 		position: relative;
@@ -737,19 +962,8 @@
 		color: var(--ink-3);
 		pointer-events: none;
 	}
-	.list {
-		display: grid;
-		gap: 0.7rem;
-	}
-	.empty {
-		text-align: center;
-		color: var(--ink-3);
-		font-style: italic;
-		border: 1px dashed var(--line);
-		border-radius: 14px;
-		padding: 2rem 1rem;
-		background: var(--card);
-	}
+
+	/* ===== Bulk bar ===== */
 	.bulk-bar {
 		display: flex;
 		align-items: center;
@@ -761,6 +975,7 @@
 		padding: 0.6em 0.8em;
 		margin-bottom: 1rem;
 		font-size: 12.5px;
+		box-shadow: var(--shadow);
 	}
 	.bulk-check {
 		display: inline-flex;
@@ -768,6 +983,7 @@
 		gap: 0.4em;
 		font-weight: 600;
 		color: var(--ink-2);
+		cursor: pointer;
 	}
 	.bulk-cb {
 		display: grid;
@@ -776,6 +992,12 @@
 	.bulk-count {
 		color: var(--ink-3);
 	}
+
+	/* ===== List ===== */
+	.list {
+		display: grid;
+		gap: 0.6rem;
+	}
 	.item {
 		display: grid;
 		grid-template-columns: auto auto 1fr auto;
@@ -783,14 +1005,16 @@
 		align-items: center;
 		background: var(--card);
 		border: 1px solid var(--line-soft);
-		border-radius: 14px;
-		padding: 0.8rem 0.85rem;
-		box-shadow: var(--shadow-1);
-		transition: opacity 0.2s ease, border-color 0.2s ease;
+		border-radius: 12px;
+		padding: 0.75rem 0.85rem;
+		box-shadow: var(--shadow);
+		transition: border-color 0.15s ease;
+	}
+	.item:hover {
+		border-color: var(--line);
 	}
 	.item.is-sent {
-		background: rgba(255, 255, 255, 0.7);
-		border-color: var(--line);
+		background: #fcfcfd;
 	}
 	.btn-check {
 		background: transparent;
@@ -800,10 +1024,10 @@
 		display: grid;
 		place-items: center;
 		padding: 0.2rem;
-		transition: color 0.2s ease;
+		transition: color 0.15s ease;
 	}
 	.btn-check.checked {
-		color: #10b981;
+		color: var(--ok);
 	}
 	.info {
 		min-width: 0;
@@ -811,25 +1035,55 @@
 	.name-row {
 		display: flex;
 		align-items: center;
-		gap: 0.5em;
+		gap: 0.55em;
+		min-width: 0;
+	}
+	.li-avatar {
+		flex: none;
+		width: 26px;
+		height: 26px;
+		border-radius: 50%;
+		display: grid;
+		place-items: center;
+		font-size: 12px;
+		font-weight: 700;
+		color: var(--accent-strong);
+		background: var(--accent-soft);
 	}
 	.info strong {
-		display: block;
 		font-size: 14.5px;
 		color: var(--ink);
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
-	.sent-tag {
-		font-size: 10px;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		background: #d1fae5;
-		color: #065f46;
-		padding: 0.1em 0.5em;
+	.pill {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4em;
 		border-radius: 999px;
+		padding: 0.15em 0.6em;
+		font-size: 10.5px;
+		font-weight: 600;
+		background: var(--line-soft);
+		color: var(--ink-2);
+		border: 1px solid var(--line);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+	.pill .dot {
+		width: 5px;
+		height: 5px;
+		border-radius: 50%;
+		background: var(--ink-3);
+	}
+	.pill.ok {
+		background: var(--ok-bg);
+		color: var(--ok);
+		border-color: #a7f3d0;
+	}
+	.pill.ok .dot {
+		background: var(--ok);
 	}
 	.link {
 		display: inline-flex;
@@ -839,74 +1093,280 @@
 		color: var(--ink-3);
 		text-decoration: none;
 		word-break: break-all;
+		margin-top: 0.15rem;
 	}
 	.link:hover {
-		color: var(--gold-3);
+		color: var(--accent-strong);
 	}
 	.actions {
 		display: flex;
 		gap: 0.35rem;
 	}
-	.ic {
-		width: 36px;
-		height: 36px;
-		border-radius: 50%;
+
+	/* ===== Buttons ===== */
+	.btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.45em;
+		border-radius: 10px;
+		padding: 0.55em 1em;
+		font-size: 13px;
+		font-weight: 600;
+		font-family: inherit;
+		cursor: pointer;
+		border: 1px solid transparent;
+		transition: background 0.12s ease, box-shadow 0.12s ease, transform 0.05s ease;
+		text-decoration: none;
+	}
+	.btn:active {
+		transform: translateY(1px);
+	}
+	.btn:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+	.btn-primary {
+		background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+		color: #fff;
+		box-shadow: 0 1px 3px rgba(79, 70, 229, 0.35);
+	}
+	.btn-primary:hover {
+		box-shadow: 0 3px 8px rgba(79, 70, 229, 0.4);
+	}
+	.btn-ghost {
+		background: var(--card);
+		border-color: var(--line);
+		color: var(--ink-2);
+	}
+	.btn-ghost:hover {
+		border-color: #d0d5dd;
+		color: var(--ink);
+		background: #f9fafb;
+	}
+	.btn.sm {
+		padding: 0.35em 0.8em;
+		font-size: 12px;
+	}
+	.danger-ghost {
 		border: 1px solid var(--line);
-		background: #fff;
+		background: var(--card);
+		color: var(--danger);
+	}
+	.danger-ghost:hover {
+		background: var(--danger-bg);
+		border-color: #fecaca;
+	}
+	.icon-btn {
+		width: 34px;
+		height: 34px;
+		border-radius: 9px;
+		border: 1px solid var(--line);
+		background: var(--card);
 		display: grid;
 		place-items: center;
-		color: var(--ink-2);
 		cursor: pointer;
+		color: var(--ink-2);
 		text-decoration: none;
-		transition: all 0.2s ease;
+		transition: background 0.12s ease, color 0.12s ease;
 	}
-	.ic.ok {
-		border-color: var(--gold-2);
-		color: var(--gold-3);
+	.icon-btn:hover {
+		background: var(--line-soft);
+		color: var(--ink);
 	}
-	.ic.wa {
-		color: #16a34a;
-		background: #f0fdf4;
+	.icon-btn.ok {
+		border-color: #a7f3d0;
+		color: var(--ok);
+		background: var(--ok-bg);
+	}
+	.icon-btn.wa {
+		color: var(--ok);
+		background: var(--ok-bg);
 		border-color: #bbf7d0;
 	}
-	.ic.wa:hover {
+	.icon-btn.wa:hover {
 		background: #22c55e;
 		color: #fff;
 		border-color: #22c55e;
 	}
-	.ic.del:hover {
-		background: #fee2e2;
-		color: #b91c1c;
+	.icon-btn.danger {
+		color: var(--danger);
+	}
+	.icon-btn.danger:hover {
+		background: var(--danger-bg);
 		border-color: #fecaca;
 	}
+
+	/* ===== Bottom & back ===== */
 	.bottom-actions {
 		display: flex;
 		justify-content: flex-end;
 		margin-top: 1.2rem;
 	}
-	.danger {
-		border: 1px solid var(--line);
-		background: transparent;
-		border-radius: 999px;
-		padding: 0.4em 0.9em;
-		font-size: 12px;
-		color: #b91c1c;
-		cursor: pointer;
-		display: inline-flex;
-		align-items: center;
-		gap: 0.35em;
-	}
-	.danger:hover {
-		background: #fee2e2;
-	}
 	.back {
 		display: inline-flex;
+		align-items: center;
+		gap: 0.4em;
 		margin-top: 1.4rem;
 		font-size: 13px;
 		color: var(--ink-2);
 		text-decoration: none;
 	}
 	.back:hover {
-		color: var(--ink);
+		color: var(--accent-strong);
+	}
+
+	/* ===== Empty ===== */
+	.empty {
+		background: var(--card);
+		border: 1px dashed var(--line);
+		border-radius: var(--radius);
+		padding: 2.2rem 1.4rem;
+		text-align: center;
+		color: var(--ink-3);
+	}
+	.empty strong {
+		display: block;
+		font-size: 15px;
+		color: var(--ink-2);
+		margin-bottom: 0.25rem;
+	}
+	.empty p {
+		margin: 0;
+		font-size: 13px;
+	}
+
+	/* ===== PIN gate ===== */
+	.pin-wrap {
+		display: grid;
+		place-items: center;
+		min-height: 60svh;
+	}
+	.pin-card {
+		width: min(100%, 440px);
+		display: grid;
+		gap: 0.9rem;
+		padding: 2rem;
+		text-align: center;
+	}
+	.pin-ic {
+		justify-self: center;
+		width: 52px;
+		height: 52px;
+		border-radius: 15px;
+		display: grid;
+		place-items: center;
+		color: #fff;
+		background: linear-gradient(135deg, var(--accent), #8b5cf6);
+		box-shadow: 0 4px 10px rgba(99, 91, 255, 0.35);
+	}
+	.pin-card h1 {
+		margin: 0;
+		font-size: 20px;
+		font-weight: 700;
+	}
+	.pin-desc {
+		margin: -0.4rem 0 0;
+		font-size: 13px;
+		color: var(--ink-2);
+	}
+	.pin-desc code {
+		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+		font-size: 12px;
+		color: var(--accent-strong);
+		background: var(--accent-soft);
+		border-radius: 6px;
+		padding: 0.1em 0.4em;
+	}
+	.pin-field input {
+		text-align: center;
+		font-size: 16px;
+		letter-spacing: 0.2em;
+		padding: 0.75em 0.9em;
+	}
+	.pin-hint {
+		margin: 0.2rem 0 0;
+		font-size: 12px;
+		color: var(--ink-3);
+		line-height: 1.6;
+	}
+	.pin-hint code,
+	.pin-hint em {
+		font-style: normal;
+		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+		font-size: 11px;
+		color: var(--ink-2);
+	}
+
+	/* ===== Feedback ===== */
+	.alert {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5em;
+		border-radius: 10px;
+		padding: 0.6em 0.9em;
+		font-size: 13px;
+	}
+	.alert.err {
+		color: var(--danger);
+		background: var(--danger-bg);
+		border: 1px solid #fecaca;
+	}
+	.toast {
+		position: fixed;
+		bottom: 1.2rem;
+		right: 1.2rem;
+		z-index: 80;
+		display: flex;
+		align-items: center;
+		gap: 0.5em;
+		background: #111827;
+		color: #fff;
+		border-radius: 12px;
+		padding: 0.7em 1.1em;
+		font-size: 13px;
+		box-shadow: var(--shadow-lg);
+		animation: toast-in 0.18s ease;
+	}
+	.toast.err {
+		background: var(--danger);
+	}
+	@keyframes toast-in {
+		from {
+			opacity: 0;
+			transform: translateY(8px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+
+	/* ===== Responsive ===== */
+	@media (max-width: 760px) {
+		.f-row {
+			grid-template-columns: 1fr;
+		}
+		.filter-bar {
+			grid-template-columns: 1fr;
+		}
+		.kpis {
+			grid-template-columns: 1fr 1fr;
+		}
+		.main {
+			padding: 1.1rem 1rem 3rem;
+		}
+		.page-head {
+			flex-direction: column;
+			align-items: flex-start;
+		}
+		.item {
+			grid-template-columns: auto auto 1fr;
+		}
+		.item .actions {
+			grid-column: 3;
+			justify-content: flex-end;
+		}
 	}
 </style>

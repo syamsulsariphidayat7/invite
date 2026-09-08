@@ -2,7 +2,28 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { templateMeta, DEFAULT_TEMPLATE } from '$lib/layouts/meta';
-	import { LogOut, Plus, Trash2, Edit3, Copy, Check, ExternalLink, Upload, Users, MessageCircle } from 'lucide-svelte';
+	import {
+		LogOut,
+		Plus,
+		Trash2,
+		Edit3,
+		Copy,
+		Check,
+		ExternalLink,
+		Upload,
+		Users,
+		MessageCircle,
+		LayoutDashboard,
+		FileText,
+		ArrowLeft,
+		Menu,
+		X,
+		Image as ImageIcon,
+		Music,
+		MapPin,
+		Link2,
+		Palette
+	} from 'lucide-svelte';
 
 	interface InvitationItem {
 		id: string;
@@ -44,6 +65,37 @@
 	let uploadBusy = $state(false);
 	let uploadMsg = $state('');
 	let exportType = $state<'tamu' | 'ucapan'>('tamu');
+	let sidebarOpen = $state(false);
+
+	let toast = $state<{ msg: string; type: 'ok' | 'err' } | null>(null);
+	let toastTimer: ReturnType<typeof setTimeout> | null = null;
+	function notify(msg: string, type: 'ok' | 'err' = 'ok') {
+		toast = { msg, type };
+		if (toastTimer) clearTimeout(toastTimer);
+		toastTimer = setTimeout(() => (toast = null), 2800);
+	}
+
+	const tabLabels: Record<typeof tab, string> = {
+		overview: 'Ringkasan',
+		tamu: 'Tamu',
+		ucapan: 'Ucapan',
+		foto: 'Foto',
+		konten: 'Konten'
+	};
+
+	function templateLabel(id: string): string {
+		return templateMeta.find((t) => t.id === id)?.label ?? id;
+	}
+	function initials(a: string, b: string): string {
+		return ((a || '?')[0] + (b || '?')[0]).toUpperCase();
+	}
+	function formatDate(v: string | null): string {
+		if (!v) return '—';
+		const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(v);
+		const d = m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(v);
+		if (Number.isNaN(d.getTime())) return v;
+		return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+	}
 
 	let kontenSaving = $state(false);
 	let kontenMsg = $state('');
@@ -79,6 +131,8 @@
 	let formPin = $state('');
 	let formSaving = $state(false);
 	let formErr = $state('');
+
+	let cur = $derived(items.find((x) => x.subdomain === selected));
 
 	async function load() {
 		loading = true;
@@ -142,11 +196,12 @@
 					headers: { 'content-type': 'application/json' },
 					body: JSON.stringify({
 						namaPihak1: formPihak1,
-						namaPihak2: formPihak2,					tanggalAcara: formTanggal || null,
-					template: formTemplate,
-					status: formStatus,
-					accessPin: formPin || null
-				})
+						namaPihak2: formPihak2,
+						tanggalAcara: formTanggal || null,
+						template: formTemplate,
+						status: formStatus,
+						accessPin: formPin || null
+					})
 				});
 				const j = await res.json().catch(() => null);
 				if (!res.ok) {
@@ -154,6 +209,7 @@
 					return;
 				}
 				showForm = false;
+				notify('Perubahan disimpan.');
 				await load();
 			} else {
 				const sd = formSubdomain.trim().toLowerCase();
@@ -167,11 +223,12 @@
 					body: JSON.stringify({
 						subdomain: sd,
 						namaPihak1: formPihak1,
-						namaPihak2: formPihak2,					tanggalAcara: formTanggal || null,
-					template: formTemplate,
-					status: formStatus,
-					accessPin: formPin || null
-				})
+						namaPihak2: formPihak2,
+						tanggalAcara: formTanggal || null,
+						template: formTemplate,
+						status: formStatus,
+						accessPin: formPin || null
+					})
 				});
 				const j = await res.json().catch(() => null);
 				if (!res.ok) {
@@ -179,6 +236,7 @@
 					return;
 				}
 				showForm = false;
+				notify('Undangan berhasil dibuat.');
 				await load();
 			}
 		} finally {
@@ -191,9 +249,11 @@
 		const res = await fetch(`/api/admin/invitations?subdomain=${encodeURIComponent(sd)}`, { method: 'DELETE' });
 		if (!res.ok) {
 			const j = await res.json().catch(() => null);
-			alert(j?.message ?? 'Gagal menghapus.');
+			notify(j?.message ?? 'Gagal menghapus.', 'err');
 			return;
 		}
+		if (selected === sd) closeDetail();
+		notify('Undangan dihapus.');
 		await load();
 	}
 
@@ -212,6 +272,12 @@
 
 	function previewUrl(sd: string): string {
 		return `/${sd}`;
+	}
+
+	function closeDetail() {
+		selected = null;
+		tab = 'overview';
+		sidebarOpen = false;
 	}
 
 	function hydrateKonten(it: InvitationItem) {
@@ -243,7 +309,7 @@
 		kontenWishes = { minName: typeof ws?.minName === 'number' ? ws.minName : 2, minMessage: typeof ws?.minMessage === 'number' ? ws.minMessage : 2, note: typeof ws?.note === 'string' ? ws.note : '' };
 		kontenPhotosCover = (dj.photos as Record<string, string> | undefined)?.cover ?? '';
 		kontenLivestream = (dj.livestream_url as string) ?? '';
-		kontenStoryIntro = (dj.love_story_intro as string) ?? ((dj.love_story as unknown[]) ? '' : '');
+		kontenStoryIntro = (dj.love_story_intro as string) ?? '';
 		const ls = Array.isArray(dj.love_story) ? (dj.love_story as { title: string; text: string }[]) : [];
 		kontenStoryChapters = ls.map((c) => ({ title: c.title ?? '', text: c.text ?? '' }));
 		kontenMsg = '';
@@ -252,6 +318,7 @@
 	async function openDetail(sd: string, t: typeof tab = 'overview') {
 		selected = sd;
 		tab = t;
+		sidebarOpen = false;
 		detailLoading = true;
 		try {
 			const [gRes, wRes] = await Promise.all([
@@ -282,9 +349,9 @@
 		kontenMsg = '';
 		try {
 			const it = items.find((x) => x.subdomain === selected);
-			const cur = (it?.dataJson ?? {}) as Record<string, unknown>;
+			const curD = (it?.dataJson ?? {}) as Record<string, unknown>;
 			const next: Record<string, unknown> = {
-				...cur,
+				...curD,
 				theme: { primary: kontenThemePrimary, secondary: kontenThemeSecondary },
 				events: kontenEvents.filter((e) => e.name.trim() || e.date.trim()),
 				gifts: kontenGifts.filter((g) => g.number.trim()),
@@ -309,7 +376,7 @@
 					note: kontenWishes.note.trim()
 				},
 				photos: {
-					...(typeof cur.photos === 'object' && cur.photos ? (cur.photos as Record<string, unknown>) : {}),
+					...(typeof curD.photos === 'object' && curD.photos ? (curD.photos as Record<string, unknown>) : {}),
 					cover: kontenPhotosCover.trim() || null
 				},
 				livestream_url: kontenLivestream.trim() || null,
@@ -322,10 +389,16 @@
 				body: JSON.stringify({ dataJson: next })
 			});
 			const j = await res.json().catch(() => null);
-			if (!res.ok) { kontenMsg = j?.message ?? 'Gagal menyimpan.'; return; }
+			if (!res.ok) { kontenMsg = j?.message ?? 'Gagal menyimpan.'; notify(kontenMsg, 'err'); return; }
 			if (it) it.dataJson = j.item.dataJson ?? next;
 			kontenMsg = 'Tersimpan.';
-		} catch { kontenMsg = 'Gagal menyimpan.'; } finally { kontenSaving = false; }
+			notify('Konten tersimpan.');
+		} catch {
+			kontenMsg = 'Gagal menyimpan.';
+			notify('Gagal menyimpan.', 'err');
+		} finally {
+			kontenSaving = false;
+		}
 	}
 
 	async function deleteWish(id: number) {
@@ -333,10 +406,11 @@
 		if (!confirm('Hapus ucapan ini?')) return;
 		const res = await fetch(`/api/admin/wishes?slug=${encodeURIComponent(selected)}&id=${id}`, { method: 'DELETE' });
 		if (!res.ok) {
-			alert('Gagal menghapus.');
+			notify('Gagal menghapus.', 'err');
 			return;
 		}
 		detailWishes = detailWishes.filter((w) => w.id !== id);
+		notify('Ucapan dihapus.');
 	}
 
 	function currentGallery(): string[] {
@@ -349,10 +423,11 @@
 		if (!confirm('Hapus foto ini dari galeri?')) return;
 		const res = await fetch(`/api/admin/upload?slug=${encodeURIComponent(selected)}&url=${encodeURIComponent(url)}`, { method: 'DELETE' });
 		const j = await res.json().catch(() => null);
-		if (!res.ok) { uploadMsg = j?.message ?? 'Gagal menghapus.'; return; }
+		if (!res.ok) { uploadMsg = j?.message ?? 'Gagal menghapus.'; notify(uploadMsg, 'err'); return; }
 		const it = items.find((x) => x.subdomain === selected);
 		if (it) it.dataJson = { ...(it.dataJson ?? {}), gallery: j.gallery ?? currentGallery().filter((u) => u !== url) };
 		uploadMsg = 'Foto dihapus.';
+		notify('Foto dihapus.');
 	}
 	async function moveGallery(idx: number, dir: -1 | 1) {
 		if (!selected) return;
@@ -362,7 +437,7 @@
 		[arr[idx], arr[j]] = [arr[j], arr[idx]];
 		const res = await fetch(`/api/admin/upload?slug=${encodeURIComponent(selected)}&reorder=${encodeURIComponent(JSON.stringify(arr))}`, { method: 'DELETE' });
 		const rj = await res.json().catch(() => null);
-		if (!res.ok) { uploadMsg = rj?.message ?? 'Gagal reorder.'; return; }
+		if (!res.ok) { uploadMsg = rj?.message ?? 'Gagal reorder.'; notify(uploadMsg, 'err'); return; }
 		const it = items.find((x) => x.subdomain === selected);
 		if (it) it.dataJson = { ...(it.dataJson ?? {}), gallery: rj.gallery ?? arr };
 	}
@@ -379,16 +454,19 @@
 			const j = await res.json().catch(() => null);
 			if (!res.ok) {
 				uploadMsg = j?.message ?? 'Upload gagal.';
+				notify(uploadMsg, 'err');
 				return;
 			}
 			const urls: string[] = j.urls ?? [];
 			uploadMsg = `${urls.length} foto terupload & gallery terupdate.`;
+			notify(`${urls.length} foto terupload.`);
 			if (j.gallery) {
 				const it = items.find((x) => x.subdomain === selected);
 				if (it) it.dataJson = { ...(it.dataJson ?? {}), gallery: j.gallery };
 			}
 		} catch {
 			uploadMsg = 'Gagal upload.';
+			notify('Gagal upload.', 'err');
 		} finally {
 			uploadBusy = false;
 			input.value = '';
@@ -399,7 +477,7 @@
 		if (!selected) return;
 		const rows = exportType === 'tamu' ? detailGuests : detailWishes;
 		if (rows.length === 0) {
-			alert('Tidak ada data untuk diexport.');
+			notify('Tidak ada data untuk diexport.', 'err');
 			return;
 		}
 		let csv = '';
@@ -421,7 +499,7 @@
 	async function exportServer(fmt: 'xlsx' | 'pdf') {
 		if (!selected) return;
 		const res = await fetch(`/api/admin/wishes?slug=${encodeURIComponent(selected)}&format=${fmt}&type=${exportType}`);
-		if (!res.ok) { alert('Export gagal.'); return; }
+		if (!res.ok) { notify('Export gagal.', 'err'); return; }
 		const blob = await res.blob();
 		const a = document.createElement('a');
 		a.href = URL.createObjectURL(blob);
@@ -430,93 +508,211 @@
 	}
 </script>
 
-<svelte:head><title>Admin — Undangan</title></svelte:head>
+<svelte:head><title>Panel Admin — Undangan</title></svelte:head>
 
-<div class="admin">
-	<div class="wrap-wide">
-		<header class="head">
-			<div>
-				<h1>Admin — Undangan</h1>
-				<p class="hint">Kelola subdomain, status, dan PIN kelola tamu. Foto/statis masih via <code>wedding.ts</code> + <code>static/photos</code> per-undangan (Storage Fase berikutnya).</p>
-			</div>
-			<div class="head-actions">
-				<button class="btn btn-green" onclick={openCreate}><Plus size={16} /> Buat Undangan</button>
-				<button class="btn btn-ghost" onclick={logout}><LogOut size={16} /> Keluar</button>
-			</div>
-		</header>
-
-		{#if loading}
-			<p class="muted">Memuat…</p>
-		{:else if err}
-			<p class="err">{err}</p>
-		{:else if items.length === 0}
-			<div class="empty">Belum ada undangan. Buat pertama dengan subdomain mis. <code>ruhaeni-roni</code>.</div>
-		{:else}
-			<div class="table-wrap">
-				<table>
-					<thead>
-						<tr>
-							<th>Subdomain / Link</th>
-							<th>Pasangan</th>
-							<th>Tanggal</th>
-							<th>Status</th>
-							<th>PIN Kelola</th>
-							<th>Aksi</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each items as it}
-							<tr class:selected={selected === it.subdomain}>
-								<td>
-									<button class="lnk strong" onclick={() => openDetail(it.subdomain)}><code>{it.subdomain}</code></button>
-									<div class="links">
-										<a href={previewUrl(it.subdomain)} target="_blank" rel="noopener"><ExternalLink size={12} /> Lihat</a>
-										<a href={`/${it.subdomain}/kelola?pin=${encodeURIComponent(it.accessPin ?? '')}`} target="_blank" rel="noopener">Kelola</a>
-										<button class="lnk" onclick={() => copy(`${location.origin}/${it.subdomain}`, it.subdomain)}>
-											{#if copied === it.subdomain}<Check size={12} /> Tersalin{:else}<Copy size={12} /> Salin Link{/if}
-										</button>
-									</div>
-								</td>
-								<td>{it.namaPihak1 || '—'} & {it.namaPihak2 || '—'}</td>
-								<td>{it.tanggalAcara ?? '—'}</td>
-								<td><span class="badge" class:active={it.status === 'active'}>{it.status}</span></td>
-								<td><code class="pin">{it.accessPin ?? '—'}</code></td>
-								<td class="actions">
-									<button class="ic" onclick={() => openEdit(it)} title="Edit"><Edit3 size={14} /></button>
-									<button class="ic" onclick={() => openDetail(it.subdomain)} title="Detail"><Users size={14} /></button>
-									<button class="ic danger" onclick={() => del(it.subdomain)} title="Hapus"><Trash2 size={14} /></button>
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			</div>
-		{/if}
-
-		{#if selected}
-			<div class="detail">
-				<div class="detail-head">
-					<h2>Detail — {selected}</h2>
-					<button class="btn btn-ghost" onclick={() => (selected = null)}>Tutup</button>
+<div class="shell">
+	<header class="topbar">
+		<div class="topbar-left">
+			<button class="burger" onclick={() => (sidebarOpen = !sidebarOpen)} aria-label="Buka menu"><Menu size={20} /></button>
+			<div class="brand">
+				<div class="logo-mark">
+					<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+						<path d="M7 3h4v4.5M17 3h-4v4.5" />
+						<circle cx="12" cy="13" r="6.5" />
+						<path d="M12 10.5v3l2 1.4" />
+					</svg>
 				</div>
-				<div class="tabs">
-					<button class:active={tab === 'overview'} onclick={() => (tab = 'overview')}>Ringkasan</button>
-					<button class:active={tab === 'tamu'} onclick={() => openDetail(selected!, 'tamu')}><Users size={13} /> Tamu ({detailGuests.length})</button>
-					<button class:active={tab === 'ucapan'} onclick={() => openDetail(selected!, 'ucapan')}><MessageCircle size={13} /> Ucapan ({detailWishes.length})</button>
-					<button class:active={tab === 'foto'} onclick={() => (tab = 'foto')}><Upload size={13} /> Foto</button>
-					<button class:active={tab === 'konten'} onclick={() => (tab = 'konten')}>Konten</button>
+				<span class="brand-name">Undangan<em>Panel Admin</em></span>
+			</div>
+		</div>
+		<div class="topbar-right">
+			<div class="user-chip">
+				<div class="avatar">AD</div>
+				<div class="user-meta">
+					<strong>Administrator</strong>
+					<span>Superuser</span>
 				</div>
+			</div>
+			<button class="icon-btn" onclick={logout} title="Keluar"><LogOut size={17} /></button>
+		</div>
+	</header>
+
+	<div class="body">
+		{#if sidebarOpen}<button class="side-overlay" aria-label="Tutup menu" onclick={() => (sidebarOpen = false)}></button>{/if}
+
+		<aside class="sidebar" class:open={sidebarOpen}>
+			{#if selected}
+				<button class="side-back" onclick={closeDetail}><ArrowLeft size={15} /> Daftar Undangan</button>
+				<div class="side-inv">
+					<div class="side-inv-mono">{initials(cur?.namaPihak1 ?? '', cur?.namaPihak2 ?? '')}</div>
+					<div class="side-inv-meta">
+						<strong title={selected}>{selected}</strong>
+						<span>{cur?.namaPihak1 || '?'} & {cur?.namaPihak2 || '?'}</span>
+					</div>
+				</div>
+				<p class="side-label">Kelola Undangan</p>
+				<nav class="side-nav">
+					<button class:active={tab === 'overview'} onclick={() => openDetail(selected!, 'overview')}><LayoutDashboard size={15} /> Ringkasan</button>
+					<button class:active={tab === 'tamu'} onclick={() => openDetail(selected!, 'tamu')}><Users size={15} /> Tamu {#if detailGuests.length}<span class="count">{detailGuests.length}</span>{/if}</button>
+					<button class:active={tab === 'ucapan'} onclick={() => openDetail(selected!, 'ucapan')}><MessageCircle size={15} /> Ucapan {#if detailWishes.length}<span class="count">{detailWishes.length}</span>{/if}</button>
+					<button class:active={tab === 'foto'} onclick={() => { tab = 'foto'; sidebarOpen = false; }}><ImageIcon size={15} /> Foto</button>
+					<button class:active={tab === 'konten'} onclick={() => { tab = 'konten'; sidebarOpen = false; }}><FileText size={15} /> Konten</button>
+				</nav>
+				<p class="side-label">Referensi</p>
+				<nav class="side-nav">
+					<a href={previewUrl(selected)} target="_blank" rel="noopener"><ExternalLink size={15} /> Lihat Undangan</a>
+					<a href={`/${selected}/kelola?pin=${encodeURIComponent(cur?.accessPin ?? '')}`} target="_blank" rel="noopener"><Users size={15} /> Kelola Tamu</a>
+				</nav>
+			{:else}
+				<p class="side-label">Menu Utama</p>
+				<nav class="side-nav">
+					<button class="active"><LayoutDashboard size={15} /> Daftar Undangan</button>
+				</nav>
+				<div class="side-stats">
+					<div class="stat"><strong>{items.length}</strong><span>Total</span></div>
+					<div class="stat"><strong>{items.filter((i) => i.status === 'active').length}</strong><span>Aktif</span></div>
+					<div class="stat"><strong>{items.filter((i) => i.status === 'draft').length}</strong><span>Draft</span></div>
+				</div>
+				<div class="side-foot">
+					<p>Subdomain & template dikelola di sini. Klik undangan untuk membuka detail & konten.</p>
+				</div>
+			{/if}
+		</aside>
+
+		<main class="main">
+			<nav class="crumb">
+				<span class="crumb-cur">Undangan</span>
+				{#if selected}
+					<span class="crumb-sep">/</span>
+					<button class="crumb-link" onclick={closeDetail}>{selected}</button>
+					<span class="crumb-sep">/</span>
+					<span class="crumb-cur">{tabLabels[tab]}</span>
+				{:else}
+					<span class="crumb-sep">/</span>
+					<span>Daftar</span>
+				{/if}
+			</nav>
+
+			{#if !selected}
+				<header class="page-head">
+					<div>
+						<h1>Daftar Undangan</h1>
+						<p>Kelola subdomain, status, PIN kelola tamu, foto, dan konten setiap undangan.</p>
+					</div>
+					<button class="btn btn-primary" onclick={openCreate}><Plus size={16} /> Buat Undangan</button>
+				</header>
+
+				<div class="kpis">
+					<div class="kpi">
+						<div class="kpi-ic" style="--c:#6366f1;--bg:#eef2ff"><FileText size={17} /></div>
+						<div><strong>{items.length}</strong><span>Total Undangan</span></div>
+					</div>
+					<div class="kpi">
+						<div class="kpi-ic" style="--c:#059669;--bg:#ecfdf5"><LayoutDashboard size={17} /></div>
+						<div><strong>{items.filter((i) => i.status === 'active').length}</strong><span>Aktif</span></div>
+					</div>
+					<div class="kpi">
+						<div class="kpi-ic" style="--c:#d97706;--bg:#fffbeb"><Edit3 size={17} /></div>
+						<div><strong>{items.filter((i) => i.status === 'draft').length}</strong><span>Draft</span></div>
+					</div>
+				</div>
+
+				{#if loading}
+					<div class="card pad"><p class="muted">Memuat…</p></div>
+				{:else if err}
+					<div class="alert err"><X size={15} /> {err}</div>
+				{:else if items.length === 0}
+					<div class="empty">
+						<strong>Belum ada undangan</strong>
+						<p>Buat undangan pertama dengan subdomain mis. <code>ruhaeni-roni</code>.</p>
+					</div>
+				{:else}
+					<div class="card table-wrap">
+						<table>
+							<thead>
+								<tr>
+									<th>Subdomain / Link</th>
+									<th>Pasangan</th>
+									<th>Tanggal Acara</th>
+									<th>Status</th>
+									<th>PIN Kelola</th>
+									<th class="ta-r">Aksi</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each items as it}
+									<tr class:selected={selected === it.subdomain}>
+										<td>
+											<button class="lnk strong" onclick={() => openDetail(it.subdomain)}><code>{it.subdomain}</code></button>
+											<div class="links">
+												<a href={previewUrl(it.subdomain)} target="_blank" rel="noopener"><ExternalLink size={12} /> Lihat</a>
+												<button class="lnk" onclick={() => copy(`${location.origin}/${it.subdomain}`, it.subdomain)}>
+													{#if copied === it.subdomain}<Check size={12} /> Tersalin{:else}<Copy size={12} /> Salin Link{/if}
+												</button>
+											</div>
+										</td>
+										<td>
+											<div class="couple">
+												<span>{it.namaPihak1 || '—'} <i>&</i> {it.namaPihak2 || '—'}</span>
+												<span class="tag" title={templateMeta.find((t) => t.id === it.template)?.description}>{templateLabel(it.template)}</span>
+											</div>
+										</td>
+										<td>{formatDate(it.tanggalAcara)}</td>
+										<td>
+											<span class="pill" class:ok={it.status === 'active'} class:warn={it.status === 'draft'} class:muted-pill={it.status === 'expired'}>
+												<span class="dot"></span>{it.status}
+											</span>
+										</td>
+										<td><code class="pin">{it.accessPin ?? '—'}</code></td>
+										<td class="ta-r">
+											<div class="actions">
+												<button class="icon-btn sm" onclick={() => openEdit(it)} title="Edit"><Edit3 size={14} /></button>
+												<button class="icon-btn sm" onclick={() => openDetail(it.subdomain)} title="Detail"><Users size={14} /></button>
+												<button class="icon-btn sm danger" onclick={() => del(it.subdomain)} title="Hapus"><Trash2 size={14} /></button>
+											</div>
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				{/if}
+			{/if}
+
+			{#if selected}
+				<header class="detail-head card">
+					<div class="dh-left">
+						<div class="dh-mono">{initials(cur?.namaPihak1 ?? '', cur?.namaPihak2 ?? '')}</div>
+						<div>
+							<h1>{cur?.namaPihak1 || '—'} <i>&</i> {cur?.namaPihak2 || '—'}</h1>
+							<p class="dh-sub">
+								<code>{selected}</code>
+								<span class="tag">{templateLabel(cur?.template ?? '')}</span>
+								<span class="pill" class:ok={cur?.status === 'active'} class:warn={cur?.status === 'draft'}><span class="dot"></span>{cur?.status}</span>
+							</p>
+						</div>
+					</div>
+					<div class="dh-actions">
+						<button class="btn btn-ghost" onclick={() => cur && openEdit(cur)}><Edit3 size={14} /> Edit</button>
+						<a class="btn btn-ghost" href={previewUrl(selected)} target="_blank" rel="noopener"><ExternalLink size={14} /> Lihat</a>
+						<a class="btn btn-ghost" href={`/${selected}/kelola?pin=${encodeURIComponent(cur?.accessPin ?? '')}`} target="_blank" rel="noopener"><Users size={14} /> Kelola Tamu</a>
+					</div>
+				</header>
 
 				{#if detailLoading}
-					<p class="muted">Memuat…</p>
+					<div class="card pad"><p class="muted">Memuat…</p></div>
 				{:else if tab === 'overview'}
-					<div class="overview">
-						<p><strong>Tamu:</strong> {detailGuests.length} ({detailGuests.filter((g) => g.sent).length} terkirim)</p>
-						<p><strong>Ucapan:</strong> {detailWishes.length}</p>
+					<div class="ov-cards">
+						<div class="ov-card"><strong>{detailGuests.length}</strong><span>Tamu</span></div>
+						<div class="ov-card"><strong>{detailGuests.filter((g) => g.sent).length}</strong><span>Undangan Terkirim</span></div>
+						<div class="ov-card"><strong>{detailWishes.length}</strong><span>Ucapan</span></div>
+					</div>
+					<div class="card pad">
+						<h3 class="sec-title">Export Data</h3>
 						<div class="export-row">
 							<select bind:value={exportType}>
-								<option value="tamu">Tamu</option>
-								<option value="ucapan">Ucapan</option>
+								<option value="tamu">Data Tamu</option>
+								<option value="ucapan">Data Ucapan</option>
 							</select>
 							<button class="btn btn-ghost" onclick={exportCsv}>CSV</button>
 							<button class="btn btn-ghost" onclick={() => exportServer('xlsx')}>Excel</button>
@@ -524,242 +720,643 @@
 						</div>
 					</div>
 				{:else if tab === 'tamu'}
-					<div class="list">
+					<div class="card pad list">
+						<div class="list-head">
+							<h3 class="sec-title">Daftar Tamu <span class="count-pill">{detailGuests.length}</span></h3>
+						</div>
 						{#if detailGuests.length === 0}
-							<p class="muted">Belum ada tamu.</p>
+							<p class="muted empty-note">Belum ada tamu. Tambah lewat halaman <code>/{selected}/kelola</code>.</p>
 						{:else}
 							{#each detailGuests as g}
 								<div class="list-item">
-									<span>{g.name}</span><span class="badge" class:active={g.sent}>{g.sent ? 'Terkirim' : 'Belum'}</span>
+									<div class="li-left">
+										<div class="li-avatar">{(g.name || '?')[0].toUpperCase()}</div>
+										<span class="li-name">{g.name}</span>
+									</div>
+									<span class="pill" class:ok={g.sent}><span class="dot"></span>{g.sent ? 'Terkirim' : 'Belum'}</span>
 								</div>
 							{/each}
 						{/if}
 					</div>
 				{:else if tab === 'ucapan'}
-					<div class="list">
+					<div class="card pad list">
+						<div class="list-head">
+							<h3 class="sec-title">Ucapan & Doa <span class="count-pill">{detailWishes.length}</span></h3>
+						</div>
 						{#if detailWishes.length === 0}
-							<p class="muted">Belum ada ucapan.</p>
+							<p class="muted empty-note">Belum ada ucapan dari tamu.</p>
 						{:else}
 							{#each detailWishes as w}
 								<div class="wish-item">
-									<strong>{w.name}</strong> <span class="badge">{w.attendance}</span>
+									<div class="wish-top">
+										<div class="li-left">
+											<div class="li-avatar accent">{(w.name || '?')[0].toUpperCase()}</div>
+											<span class="li-name"><strong>{w.name}</strong></span>
+											<span class="pill" class:ok={w.attendance === 'hadir'} class:warn={w.attendance === 'ragu'}>{w.attendance}</span>
+										</div>
+										<button class="icon-btn sm danger" onclick={() => deleteWish(w.id)} title="Hapus ucapan"><Trash2 size={14} /></button>
+									</div>
 									<p class="wish-msg">{w.message}</p>
-									<button class="lnk danger" onclick={() => deleteWish(w.id)}>Hapus</button>
 								</div>
 							{/each}
 						{/if}
 					</div>
 				{:else if tab === 'foto'}
-					<div class="upload">
-						<p class="hint">Upload ke Supabase Storage bucket <code>invitation-photos/{selected}/</code> (Public, auto-kompresi 1600px JPEG). <code>kind=gallery|hero|bride|groom</code>.</p>
-						<label class="btn btn-green">
-							Galeri (max 12)
-							<input type="file" accept="image/*" multiple hidden onchange={(e) => uploadFiles(e, 'gallery')} disabled={uploadBusy} />
-						</label>
-						<div class="row" style="gap:0.4rem;flex-wrap:wrap;display:flex">
-							<label class="btn btn-ghost sm">Hero <input type="file" accept="image/*" hidden onchange={(e) => uploadFiles(e, 'hero')} disabled={uploadBusy} /></label>
-							<label class="btn btn-ghost sm">Bride <input type="file" accept="image/*" hidden onchange={(e) => uploadFiles(e, 'bride')} disabled={uploadBusy} /></label>
-							<label class="btn btn-ghost sm">Groom <input type="file" accept="image/*" hidden onchange={(e) => uploadFiles(e, 'groom')} disabled={uploadBusy} /></label>
+					<div class="card pad upload">
+						<h3 class="sec-title">Upload Foto</h3>
+						<p class="hint">Foto disimpan di Supabase Storage <code>invitation-photos/{selected}/</code> (public, auto-kompresi 1600px JPEG).</p>
+						<div class="upload-row">
+							<label class="btn btn-primary">
+								<Upload size={15} /> Galeri (max 12)
+								<input type="file" accept="image/*" multiple hidden onchange={(e) => uploadFiles(e, 'gallery')} disabled={uploadBusy} />
+							</label>
+							<label class="btn btn-ghost">Hero <input type="file" accept="image/*" hidden onchange={(e) => uploadFiles(e, 'hero')} disabled={uploadBusy} /></label>
+							<label class="btn btn-ghost">Bride <input type="file" accept="image/*" hidden onchange={(e) => uploadFiles(e, 'bride')} disabled={uploadBusy} /></label>
+							<label class="btn btn-ghost">Groom <input type="file" accept="image/*" hidden onchange={(e) => uploadFiles(e, 'groom')} disabled={uploadBusy} /></label>
 						</div>
-						{#if uploadMsg}<p class="muted">{uploadMsg}</p>{/if}
-						{#if uploadBusy}<p class="muted">Mengupload…</p>{/if}
+						{#if uploadMsg}<p class="hint ok">{uploadMsg}</p>{/if}
+						{#if uploadBusy}<p class="hint">Mengupload…</p>{/if}
 						{#if currentGallery().length > 0}
+							<h3 class="sec-title">Galeri Saat Ini <span class="count-pill">{currentGallery().length}</span></h3>
 							<div class="gallery-grid">
 								{#each currentGallery() as url, i}
 									<div class="gcell">
 										<img src={url} alt={`Foto ${i + 1}`} loading="lazy" />
 										<div class="gact">
-											<button class="ic sm" onclick={() => moveGallery(i, -1)} disabled={i === 0} title="Naik">↑</button>
-											<button class="ic sm" onclick={() => moveGallery(i, 1)} disabled={i === currentGallery().length - 1} title="Turun">↓</button>
-											<button class="ic danger sm" onclick={() => deleteGalleryUrl(url)} title="Hapus"><Trash2 size={12} /></button>
+											<button class="icon-btn sm" onclick={() => moveGallery(i, -1)} disabled={i === 0} title="Naik">↑</button>
+											<button class="icon-btn sm" onclick={() => moveGallery(i, 1)} disabled={i === currentGallery().length - 1} title="Turun">↓</button>
+											<button class="icon-btn sm danger" onclick={() => deleteGalleryUrl(url)} title="Hapus"><Trash2 size={12} /></button>
 										</div>
 									</div>
 								{/each}
 							</div>
 						{:else}
-							<p class="muted">Belum ada foto galeri.</p>
+							<p class="muted empty-note">Belum ada foto galeri.</p>
 						{/if}
 					</div>
 				{:else if tab === 'konten'}
 					<div class="konten">
-						<p class="hint">Edit <code>data_json</code> generik (events, gifts, couple, ayat, story, theme, musik). Simpan menimpa DB; preview di <code>/{selected}</code>.</p>
-						<h3>Events ({kontenEvents.length})</h3>
-						{#each kontenEvents as ev, i}
-							<div class="konten-row">
-								<input placeholder="Nama (Akad/Resepsi)" bind:value={kontenEvents[i].name} />
-								<input type="date" bind:value={kontenEvents[i].date} />
-								<input placeholder="Jam (08.00 WIB)" bind:value={kontenEvents[i].time} />
-								<input placeholder="Lokasi" bind:value={kontenEvents[i].location} />
-								<input placeholder="Maps URL" bind:value={kontenEvents[i].map_url} />
-								<button class="ic danger sm" onclick={() => (kontenEvents = kontenEvents.filter((_, j) => j !== i))}><Trash2 size={12} /></button>
+						<div class="card pad konten-savebar">
+							<div>
+								<h3 class="sec-title">Konten Undangan</h3>
+								<p class="hint">Simpan menimpa DB <code>data_json</code> — preview di <code>/{selected}</code>.</p>
 							</div>
-						{/each}
-						<button class="btn btn-ghost sm" onclick={() => (kontenEvents = [...kontenEvents, { name: '', date: '', time: '', location: '', map_url: '' }])}><Plus size={12} /> Tambah Acara</button>
-
-						<h3>Gifts ({kontenGifts.length})</h3>
-						{#each kontenGifts as g, i}
-							<div class="konten-row">
-								<select bind:value={kontenGifts[i].type}><option value="bank">bank</option><option value="ewallet">ewallet</option></select>
-								<input placeholder="Provider (DANA/BCA)" bind:value={kontenGifts[i].provider} />
-								<input placeholder="Pemilik" bind:value={kontenGifts[i].owner} />
-								<input placeholder="No. rekening" bind:value={kontenGifts[i].number} />
-								<button class="ic danger sm" onclick={() => (kontenGifts = kontenGifts.filter((_, j) => j !== i))}><Trash2 size={12} /></button>
-							</div>
-						{/each}
-						<button class="btn btn-ghost sm" onclick={() => (kontenGifts = [...kontenGifts, { type: 'ewallet', provider: 'DANA', owner: '', number: '' }])}><Plus size={12} /> Tambah Gift</button>
-
-						<h3>Amplop Digital</h3>
-						<label><span>Catatan gift (opsional)</span><textarea rows="2" bind:value={kontenGiftNote}></textarea></label>
-
-						<h3>Mempelai</h3>
-						<div class="grid2"><label><span>Bride name</span><input bind:value={kontenBride.name} /></label><label><span>Bride full_name</span><input bind:value={kontenBride.full_name} /></label></div>
-						<label><span>Bride relation</span><textarea rows="2" bind:value={kontenBride.relation}></textarea></label>
-						<div class="grid2"><label><span>Bride IG</span><input bind:value={kontenBride.instagram} /></label><label><span>Bride WA</span><input bind:value={kontenBride.whatsapp} /></label></div>
-						<div class="grid2"><label><span>Groom name</span><input bind:value={kontenGroom.name} /></label><label><span>Groom full_name</span><input bind:value={kontenGroom.full_name} /></label></div>
-						<label><span>Groom relation</span><textarea rows="2" bind:value={kontenGroom.relation}></textarea></label>
-						<div class="grid2"><label><span>Groom IG</span><input bind:value={kontenGroom.instagram} /></label><label><span>Groom WA</span><input bind:value={kontenGroom.whatsapp} /></label></div>
-
-						<h3>Lokasi</h3>
-						<div class="grid2"><label><span>Nama venue</span><input bind:value={kontenVenue.name} /></label><label><span>Maps URL</span><input bind:value={kontenVenue.maps_url} /></label></div>
-						<label><span>Alamat</span><textarea rows="2" bind:value={kontenVenue.address}></textarea></label>
-
-						<h3>Ayat</h3>
-						<label class="chk"><input type="checkbox" checked={!kontenVerseOff} onchange={(e) => (kontenVerseOff = !(e.target as HTMLInputElement).checked)} /> Tampilkan ayat</label>
-						{#if !kontenVerseOff}
-							<label><span>Arabic</span><textarea rows="2" bind:value={kontenVerse.arabic}></textarea></label>
-							<label><span>Terjemahan</span><textarea rows="3" bind:value={kontenVerse.translation}></textarea></label>
-							<label><span>Sumber</span><input bind:value={kontenVerse.source} /></label>
-						{/if}
-
-						<h3>Love Story</h3>
-						<label><span>Intro</span><textarea rows="2" bind:value={kontenStoryIntro}></textarea></label>
-						{#each kontenStoryChapters as ch, i}
-							<div class="konten-row">
-								<input placeholder="Judul" bind:value={kontenStoryChapters[i].title} />
-								<textarea placeholder="Teks" rows="2" bind:value={kontenStoryChapters[i].text}></textarea>
-								<button class="ic danger sm" onclick={() => (kontenStoryChapters = kontenStoryChapters.filter((_, j) => j !== i))}><Trash2 size={12} /></button>
-							</div>
-						{/each}
-						<button class="btn btn-ghost sm" onclick={() => (kontenStoryChapters = [...kontenStoryChapters, { title: '', text: '' }])}><Plus size={12} /> Tambah Bab</button>
-
-						<h3>Sosial, Ucapan & Cover</h3>
-						<div class="grid2"><label><span>WhatsApp footer</span><input placeholder="https://wa.me/62812..." bind:value={kontenSocial.whatsapp} /></label><label><span>Instagram footer</span><input placeholder="https://instagram.com/..." bind:value={kontenSocial.instagram} /></label></div>
-						<label><span>Instagram Filter URL</span><input placeholder="https://www.instagram.com/ar/..." bind:value={kontenIgFilter} /></label>
-						<div class="grid2"><label><span>Min. nama (karakter)</span><input type="number" min="1" max="50" bind:value={kontenWishes.minName} /></label><label><span>Min. pesan (karakter)</span><input type="number" min="1" max="500" bind:value={kontenWishes.minMessage} /></label></div>
-						<label><span>Catatan ucapan</span><input placeholder="Khusus untuk tamu undangan" bind:value={kontenWishes.note} /></label>
-						<label><span>Foto cover sampul</span><input placeholder="URL Supabase atau /photos/hero" bind:value={kontenPhotosCover} /></label>
-
-						<h3>Tema & Media</h3>
-						<div class="grid2"><label><span>Primary</span><input type="color" bind:value={kontenThemePrimary} /></label><label><span>Secondary</span><input type="color" bind:value={kontenThemeSecondary} /></label></div>
-						<label><span>Music URL</span><input placeholder="/audio/wedding.mp3 atau https://..." bind:value={kontenMusic} /></label>
-						<div class="grid2"><label><span>YouTube ID (fallback)</span><input placeholder="dQw4w9WgXcQ" bind:value={kontenMusicYt} /></label><label><span>Mulai detik ke-</span><input type="number" min="0" max="600" bind:value={kontenMusicStart} /></label></div>
-						<label><span>Livestream URL</span><input bind:value={kontenLivestream} /></label>
-
-						<div class="modal-actions">
-							<button class="btn btn-green" onclick={saveKonten} disabled={kontenSaving}>{kontenSaving ? 'Menyimpan…' : 'Simpan Konten'}</button>
+							<button class="btn btn-primary" onclick={saveKonten} disabled={kontenSaving}>{kontenSaving ? 'Menyimpan…' : 'Simpan Konten'}</button>
 						</div>
-						{#if kontenMsg}<p class={kontenMsg === 'Tersimpan.' ? 'muted' : 'err'}>{kontenMsg}</p>{/if}
+						{#if kontenMsg}<p class="hint" class:ok={kontenMsg === 'Tersimpan.'} class:err-text={kontenMsg !== 'Tersimpan.'}>{kontenMsg}</p>{/if}
+
+						<section class="card pad k-sec">
+							<h3 class="sec-title"><MapPin size={15} /> Events ({kontenEvents.length})</h3>
+							{#each kontenEvents as ev, i}
+								<div class="konten-row">
+									<input placeholder="Nama (Akad/Resepsi)" bind:value={kontenEvents[i].name} />
+									<input type="date" bind:value={kontenEvents[i].date} />
+									<input placeholder="Jam (08.00 WIB)" bind:value={kontenEvents[i].time} />
+									<input placeholder="Lokasi" bind:value={kontenEvents[i].location} />
+									<input placeholder="Maps URL" bind:value={kontenEvents[i].map_url} />
+									<button class="icon-btn sm danger" onclick={() => (kontenEvents = kontenEvents.filter((_, j) => j !== i))}><Trash2 size={12} /></button>
+								</div>
+							{/each}
+							<button class="btn btn-ghost sm" onclick={() => (kontenEvents = [...kontenEvents, { name: '', date: '', time: '', location: '', map_url: '' }])}><Plus size={12} /> Tambah Acara</button>
+						</section>
+
+						<section class="card pad k-sec">
+							<h3 class="sec-title"><Palette size={15} /> Gifts ({kontenGifts.length})</h3>
+							{#each kontenGifts as g, i}
+								<div class="konten-row">
+									<select bind:value={kontenGifts[i].type}><option value="bank">bank</option><option value="ewallet">ewallet</option></select>
+									<input placeholder="Provider (DANA/BCA)" bind:value={kontenGifts[i].provider} />
+									<input placeholder="Pemilik" bind:value={kontenGifts[i].owner} />
+									<input placeholder="No. rekening" bind:value={kontenGifts[i].number} />
+									<button class="icon-btn sm danger" onclick={() => (kontenGifts = kontenGifts.filter((_, j) => j !== i))}><Trash2 size={12} /></button>
+								</div>
+							{/each}
+							<button class="btn btn-ghost sm" onclick={() => (kontenGifts = [...kontenGifts, { type: 'ewallet', provider: 'DANA', owner: '', number: '' }])}><Plus size={12} /> Tambah Gift</button>
+							<h3 class="sec-title sub">Amplop Digital</h3>
+							<label><span>Catatan gift (opsional)</span><textarea rows="2" bind:value={kontenGiftNote}></textarea></label>
+						</section>
+
+						<section class="card pad k-sec">
+							<h3 class="sec-title"><Users size={15} /> Mempelai</h3>
+							<div class="grid2"><label><span>Bride name</span><input bind:value={kontenBride.name} /></label><label><span>Bride full_name</span><input bind:value={kontenBride.full_name} /></label></div>
+							<label><span>Bride relation</span><textarea rows="2" bind:value={kontenBride.relation}></textarea></label>
+							<div class="grid2"><label><span>Bride IG</span><input bind:value={kontenBride.instagram} /></label><label><span>Bride WA</span><input bind:value={kontenBride.whatsapp} /></label></div>
+							<div class="grid2"><label><span>Groom name</span><input bind:value={kontenGroom.name} /></label><label><span>Groom full_name</span><input bind:value={kontenGroom.full_name} /></label></div>
+							<label><span>Groom relation</span><textarea rows="2" bind:value={kontenGroom.relation}></textarea></label>
+							<div class="grid2"><label><span>Groom IG</span><input bind:value={kontenGroom.instagram} /></label><label><span>Groom WA</span><input bind:value={kontenGroom.whatsapp} /></label></div>
+						</section>
+
+						<section class="card pad k-sec">
+							<h3 class="sec-title"><MapPin size={15} /> Lokasi & Ayat</h3>
+							<div class="grid2"><label><span>Nama venue</span><input bind:value={kontenVenue.name} /></label><label><span>Maps URL</span><input bind:value={kontenVenue.maps_url} /></label></div>
+							<label><span>Alamat</span><textarea rows="2" bind:value={kontenVenue.address}></textarea></label>
+							<h3 class="sec-title sub">Ayat</h3>
+							<label class="chk"><input type="checkbox" checked={!kontenVerseOff} onchange={(e) => (kontenVerseOff = !(e.target as HTMLInputElement).checked)} /> Tampilkan ayat</label>
+							{#if !kontenVerseOff}
+								<label><span>Arabic</span><textarea rows="2" bind:value={kontenVerse.arabic}></textarea></label>
+								<label><span>Terjemahan</span><textarea rows="3" bind:value={kontenVerse.translation}></textarea></label>
+								<label><span>Sumber</span><input bind:value={kontenVerse.source} /></label>
+							{/if}
+						</section>
+
+						<section class="card pad k-sec">
+							<h3 class="sec-title"><FileText size={15} /> Love Story</h3>
+							<label><span>Intro</span><textarea rows="2" bind:value={kontenStoryIntro}></textarea></label>
+							{#each kontenStoryChapters as ch, i}
+								<div class="konten-row">
+									<input placeholder="Judul" bind:value={kontenStoryChapters[i].title} />
+									<textarea placeholder="Teks" rows="2" bind:value={kontenStoryChapters[i].text}></textarea>
+									<button class="icon-btn sm danger" onclick={() => (kontenStoryChapters = kontenStoryChapters.filter((_, j) => j !== i))}><Trash2 size={12} /></button>
+								</div>
+							{/each}
+							<button class="btn btn-ghost sm" onclick={() => (kontenStoryChapters = [...kontenStoryChapters, { title: '', text: '' }])}><Plus size={12} /> Tambah Bab</button>
+						</section>
+
+						<section class="card pad k-sec">
+							<h3 class="sec-title"><Link2 size={15} /> Sosial, Ucapan & Cover</h3>
+							<div class="grid2"><label><span>WhatsApp footer</span><input placeholder="https://wa.me/62812..." bind:value={kontenSocial.whatsapp} /></label><label><span>Instagram footer</span><input placeholder="https://instagram.com/..." bind:value={kontenSocial.instagram} /></label></div>
+							<label><span>Instagram Filter URL</span><input placeholder="https://www.instagram.com/ar/..." bind:value={kontenIgFilter} /></label>
+							<div class="grid2"><label><span>Min. nama (karakter)</span><input type="number" min="1" max="50" bind:value={kontenWishes.minName} /></label><label><span>Min. pesan (karakter)</span><input type="number" min="1" max="500" bind:value={kontenWishes.minMessage} /></label></div>
+							<label><span>Catatan ucapan</span><input placeholder="Khusus untuk tamu undangan" bind:value={kontenWishes.note} /></label>
+							<label><span>Foto cover sampul</span><input placeholder="URL Supabase atau /photos/hero" bind:value={kontenPhotosCover} /></label>
+						</section>
+
+						<section class="card pad k-sec">
+							<h3 class="sec-title"><Music size={15} /> Tema & Media</h3>
+							<div class="grid2"><label><span>Primary</span><input type="color" bind:value={kontenThemePrimary} /></label><label><span>Secondary</span><input type="color" bind:value={kontenThemeSecondary} /></label></div>
+							<label><span>Music URL</span><input placeholder="/audio/wedding.mp3 atau https://..." bind:value={kontenMusic} /></label>
+							<div class="grid2"><label><span>YouTube ID (fallback)</span><input placeholder="dQw4w9WgXcQ" bind:value={kontenMusicYt} /></label><label><span>Mulai detik ke-</span><input type="number" min="0" max="600" bind:value={kontenMusicStart} /></label></div>
+							<label><span>Livestream URL</span><input bind:value={kontenLivestream} /></label>
+						</section>
+
+						<div class="sticky-save">
+							<button class="btn btn-primary" onclick={saveKonten} disabled={kontenSaving}>{kontenSaving ? 'Menyimpan…' : 'Simpan Konten'}</button>
+						</div>
 					</div>
 				{/if}
-			</div>
-		{/if}
-
-		{#if showForm}
-			<div class="modal" role="dialog" aria-modal="true">
-				<button class="backdrop" type="button" aria-label="Tutup" onclick={() => (showForm = false)}></button>
-				<form class="modal-card" onsubmit={submit}>
-					<h2>{editing ? `Edit ${editing}` : 'Buat Undangan Baru'}</h2>
-					<label>
-						<span>Subdomain *</span>
-						<input type="text" bind:value={formSubdomain} disabled={!!editing} placeholder="ruhaeni-roni" />
-					</label>
-					<div class="grid2">
-						<label><span>Pihak 1</span><input type="text" bind:value={formPihak1} placeholder="Ruhaeni" /></label>
-						<label><span>Pihak 2</span><input type="text" bind:value={formPihak2} placeholder="Asep Roni" /></label>
-					</div>
-					<label><span>Tanggal Acara</span><input type="date" bind:value={formTanggal} /></label>
-					<label>
-						<span>Status</span>
-						<select bind:value={formStatus}>
-							<option value="draft">draft</option>
-							<option value="active">active</option>
-							<option value="expired">expired</option>
-						</select>
-					</label>
-					<label>
-						<span>Template / Layout</span>
-						<select bind:value={formTemplate}>
-							{#each templateMeta as t}
-								<option value={t.id}>{t.label} — {t.description}</option>
-							{/each}
-						</select>
-					</label>
-					<label><span>PIN Kelola Tamu (6-digit, kosong = tanpa PIN / dev 000000)</span><input type="text" bind:value={formPin} placeholder="482913" /></label>
-					{#if formErr}<p class="err">{formErr}</p>{/if}
-					<div class="modal-actions">
-						<button type="button" class="btn btn-ghost" onclick={() => (showForm = false)}>Batal</button>
-						<button type="submit" class="btn btn-green" disabled={formSaving}>{formSaving ? 'Menyimpan…' : 'Simpan'}</button>
-					</div>
-					<p class="hint2">Konten lengkap (foto, ayat, gifts) masih dari <code>wedding.ts</code> untuk <code>ruhaeni-roni</code>. Panel ini mengelola DB <code>invitations</code> untuk tamu/ucapan per-subdomain.</p>
-				</form>
-			</div>
-		{/if}
+			{/if}
+		</main>
 	</div>
+
+	{#if showForm}
+		<div class="modal" role="dialog" aria-modal="true">
+			<button class="modal-x" type="button" aria-label="Tutup" onclick={() => (showForm = false)}><X size={18} /></button>
+			<form class="modal-card" onsubmit={submit}>
+				<h2>{editing ? `Edit ${editing}` : 'Buat Undangan Baru'}</h2>
+				<label>
+					<span>Subdomain *</span>
+					<input type="text" bind:value={formSubdomain} disabled={!!editing} placeholder="ruhaeni-roni" />
+				</label>
+				<div class="grid2">
+					<label><span>Pihak 1</span><input type="text" bind:value={formPihak1} placeholder="Ruhaeni" /></label>
+					<label><span>Pihak 2</span><input type="text" bind:value={formPihak2} placeholder="Asep Roni" /></label>
+				</div>
+				<label><span>Tanggal Acara</span><input type="date" bind:value={formTanggal} /></label>
+				<label>
+					<span>Status</span>
+					<select bind:value={formStatus}>
+						<option value="draft">draft</option>
+						<option value="active">active</option>
+						<option value="expired">expired</option>
+					</select>
+				</label>
+				<label>
+					<span>Template / Layout</span>
+					<select bind:value={formTemplate}>
+						{#each templateMeta as t}
+							<option value={t.id}>{t.label} — {t.description}</option>
+						{/each}
+					</select>
+				</label>
+				<label><span>PIN Kelola Tamu (6-digit, kosong = tanpa PIN / dev 000000)</span><input type="text" bind:value={formPin} placeholder="482913" /></label>
+				{#if formErr}<p class="alert err">{formErr}</p>{/if}
+				<div class="modal-actions">
+					<button type="button" class="btn btn-ghost" onclick={() => (showForm = false)}>Batal</button>
+					<button type="submit" class="btn btn-primary" disabled={formSaving}>{formSaving ? 'Menyimpan…' : 'Simpan'}</button>
+				</div>
+			</form>
+		</div>
+	{/if}
+
+	{#if toast}
+		<div class="toast" class:err={toast.type === 'err'} role="status">
+			{#if toast.type === 'err'}<X size={15} />{:else}<Check size={15} />{/if}
+			{toast.msg}
+		</div>
+	{/if}
 </div>
 
 <style>
-	.admin {
+	/* ===== Design tokens khusus admin (mandiri dari tema undangan) ===== */
+	.shell {
+		--bg: #f4f5f7;
+		--card: #ffffff;
+		--line: #e4e7ec;
+		--line-soft: #eef0f3;
+		--ink: #101828;
+		--ink-2: #475467;
+		--ink-3: #98a2b3;
+		--accent: #635bff;
+		--accent-strong: #4f46e5;
+		--accent-soft: #eef0ff;
+		--ok: #059669;
+		--ok-bg: #ecfdf5;
+		--warn: #d97706;
+		--warn-bg: #fffbeb;
+		--danger: #dc2626;
+		--danger-bg: #fef2f2;
+		--sidebar-bg: #101828;
+		--sidebar-ink: #98a2b3;
+		--sidebar-active: #ffffff;
+		--radius: 14px;
+		--shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 1px 3px rgba(16, 24, 40, 0.08);
+		--shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.16);
+
 		min-height: 100svh;
-		background: var(--paper);
-		padding: 1.6rem 0 3rem;
+		background: var(--bg);
+		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+		color: var(--ink);
+		font-size: 14px;
+		line-height: 1.5;
 	}
-	.head {
+	.shell * {
+		box-sizing: border-box;
+	}
+
+	/* ===== Topbar ===== */
+	.topbar {
+		position: sticky;
+		top: 0;
+		z-index: 40;
 		display: flex;
-		flex-wrap: wrap;
-		align-items: flex-start;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		height: 60px;
+		padding: 0 1.1rem;
+		background: var(--card);
+		border-bottom: 1px solid var(--line);
+	}
+	.topbar-left {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+	}
+	.burger {
+		display: none;
+		width: 36px;
+		height: 36px;
+		border: 1px solid var(--line);
+		border-radius: 10px;
+		background: var(--card);
+		color: var(--ink-2);
+		cursor: pointer;
+		place-items: center;
+	}
+	.burger:hover {
+		color: var(--ink);
+	}
+	.brand {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+	}
+	.logo-mark {
+		width: 34px;
+		height: 34px;
+		border-radius: 10px;
+		display: grid;
+		place-items: center;
+		color: #fff;
+		background: linear-gradient(135deg, var(--accent), #8b5cf6);
+		box-shadow: 0 2px 6px rgba(99, 91, 255, 0.35);
+	}
+	.brand-name {
+		font-weight: 700;
+		font-size: 15px;
+		color: var(--ink);
+		display: inline-flex;
+		align-items: baseline;
+		gap: 0.4em;
+	}
+	.brand-name em {
+		font-style: normal;
+		font-size: 11px;
+		font-weight: 600;
+		color: var(--ink-3);
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+	}
+	.topbar-right {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+	}
+	.user-chip {
+		display: flex;
+		align-items: center;
+		gap: 0.55rem;
+		padding: 0.25rem 0.5rem;
+		border-radius: 12px;
+	}
+	.user-chip:hover {
+		background: var(--line-soft);
+	}
+	.avatar {
+		width: 32px;
+		height: 32px;
+		border-radius: 50%;
+		display: grid;
+		place-items: center;
+		background: linear-gradient(135deg, var(--accent), #8b5cf6);
+		color: #fff;
+		font-size: 12px;
+		font-weight: 700;
+	}
+	.user-meta {
+		display: grid;
+		line-height: 1.2;
+	}
+	.user-meta strong {
+		font-size: 12.5px;
+		color: var(--ink);
+	}
+	.user-meta span {
+		font-size: 11px;
+		color: var(--ink-3);
+	}
+
+	/* ===== Body grid ===== */
+	.body {
+		display: grid;
+		grid-template-columns: 248px 1fr;
+		align-items: start;
+		min-height: calc(100svh - 60px);
+	}
+	.sidebar {
+		position: sticky;
+		top: 60px;
+		align-self: start;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		padding: 1.1rem 0.9rem;
+		min-height: calc(100svh - 60px);
+		background: var(--sidebar-bg);
+		color: var(--sidebar-ink);
+	}
+	.side-label {
+		margin: 0.7rem 0 0.25rem;
+		padding: 0 0.6rem;
+		font-size: 10.5px;
+		font-weight: 700;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: #667085;
+	}
+	.side-nav {
+		display: grid;
+		gap: 2px;
+	}
+	.side-nav button,
+	.side-nav a {
+		display: flex;
+		align-items: center;
+		gap: 0.6em;
+		width: 100%;
+		text-align: left;
+		border: 0;
+		background: transparent;
+		border-radius: 10px;
+		padding: 0.55em 0.7em;
+		font-size: 13.5px;
+		font-family: inherit;
+		color: var(--sidebar-ink);
+		text-decoration: none;
+		cursor: pointer;
+		transition: background 0.12s ease, color 0.12s ease;
+	}
+	.side-nav button:hover,
+	.side-nav a:hover {
+		background: rgba(255, 255, 255, 0.06);
+		color: var(--sidebar-active);
+	}
+	.side-nav button.active {
+		background: linear-gradient(90deg, rgba(99, 91, 255, 0.28), rgba(99, 91, 255, 0.12));
+		color: var(--sidebar-active);
+		box-shadow: inset 3px 0 0 var(--accent);
+	}
+	.side-nav .count {
+		margin-left: auto;
+		font-size: 11px;
+		background: rgba(255, 255, 255, 0.12);
+		border-radius: 999px;
+		padding: 0.05em 0.55em;
+		color: #d0d5dd;
+	}
+	.side-nav button.active .count {
+		background: rgba(255, 255, 255, 0.22);
+		color: #fff;
+	}
+	.side-back {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45em;
+		border: 1px solid rgba(255, 255, 255, 0.14);
+		background: rgba(255, 255, 255, 0.05);
+		border-radius: 10px;
+		padding: 0.5em 0.7em;
+		font-size: 12.5px;
+		font-family: inherit;
+		color: #d0d5dd;
+		cursor: pointer;
+	}
+	.side-back:hover {
+		background: rgba(255, 255, 255, 0.1);
+		color: #fff;
+	}
+	.side-inv {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		padding: 0.55rem 0.6rem;
+		border-radius: 12px;
+		background: rgba(255, 255, 255, 0.05);
+		border: 1px solid rgba(255, 255, 255, 0.08);
+	}
+	.side-inv-mono {
+		flex: none;
+		width: 34px;
+		height: 34px;
+		border-radius: 10px;
+		display: grid;
+		place-items: center;
+		font-size: 12px;
+		font-weight: 700;
+		color: #fff;
+		background: linear-gradient(135deg, var(--accent), #8b5cf6);
+	}
+	.side-inv-meta {
+		display: grid;
+		min-width: 0;
+	}
+	.side-inv-meta strong {
+		font-size: 13px;
+		color: #f2f4f7;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.side-inv-meta span {
+		font-size: 11.5px;
+		color: var(--sidebar-ink);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.side-stats {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 0.4rem;
+		margin-top: 0.6rem;
+	}
+	.stat {
+		display: grid;
+		gap: 0.05rem;
+		border: 1px solid rgba(255, 255, 255, 0.1);
+		border-radius: 10px;
+		padding: 0.5rem 0.3rem;
+		text-align: center;
+		background: rgba(255, 255, 255, 0.04);
+	}
+	.stat strong {
+		font-size: 17px;
+		color: #f2f4f7;
+	}
+	.stat span {
+		font-size: 10px;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--sidebar-ink);
+	}
+	.side-foot {
+		margin-top: auto;
+		padding: 0.6rem;
+		border-radius: 10px;
+		background: rgba(255, 255, 255, 0.04);
+	}
+	.side-foot p {
+		margin: 0;
+		font-size: 11.5px;
+		color: #667085;
+	}
+	.side-overlay {
+		display: none;
+	}
+
+	/* ===== Main ===== */
+	.main {
+		padding: 1.3rem 1.5rem 4rem;
+		min-width: 0;
+		max-width: 1180px;
+	}
+	.crumb {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 12.5px;
+		color: var(--ink-3);
+		margin-bottom: 1rem;
+	}
+	.crumb .crumb-cur {
+		color: var(--ink-2);
+		font-weight: 500;
+	}
+	.crumb-link {
+		border: 0;
+		background: transparent;
+		color: var(--ink-2);
+		font-size: 12.5px;
+		font-family: inherit;
+		cursor: pointer;
+		padding: 0;
+	}
+	.crumb-link:hover {
+		color: var(--accent-strong);
+	}
+	.crumb .crumb-sep {
+		color: var(--ink-3);
+	}
+	.page-head {
+		display: flex;
+		align-items: flex-end;
 		justify-content: space-between;
 		gap: 1rem;
 		margin-bottom: 1.2rem;
 	}
-	.head h1 {
-		margin: 0;
-		font-family: var(--font-serif);
-		color: var(--ink);
+	.page-head h1 {
+		margin: 0 0 0.15rem;
+		font-size: 22px;
+		font-weight: 700;
+		letter-spacing: -0.01em;
 	}
-	.hint {
-		margin: 0.35rem 0 0;
+	.page-head p {
+		margin: 0;
 		font-size: 13px;
 		color: var(--ink-2);
-		max-width: 42em;
 	}
-	.head-actions {
+
+	/* ===== KPI ===== */
+	.kpis {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 0.9rem;
+		margin-bottom: 1.2rem;
+	}
+	.kpi {
 		display: flex;
-		gap: 0.5rem;
-		flex-wrap: wrap;
-	}
-	.muted {
-		color: var(--ink-3);
-	}
-	.err {
-		color: #b91c1c;
-		background: #fef2f2;
-		border: 1px solid #fecaca;
-		border-radius: 10px;
-		padding: 0.6em 0.9em;
-	}
-	.empty {
-		background: var(--card);
-		border: 1px dashed var(--line);
-		border-radius: 14px;
-		padding: 1.4rem;
-		color: var(--ink-3);
-		text-align: center;
-	}
-	.table-wrap {
-		overflow-x: auto;
+		align-items: center;
+		gap: 0.8rem;
 		background: var(--card);
 		border: 1px solid var(--line);
-		border-radius: 16px;
+		border-radius: var(--radius);
+		padding: 0.9rem 1rem;
+		box-shadow: var(--shadow);
+	}
+	.kpi-ic {
+		flex: none;
+		width: 40px;
+		height: 40px;
+		border-radius: 11px;
+		display: grid;
+		place-items: center;
+		color: var(--c);
+		background: var(--bg);
+	}
+	.kpi strong {
+		display: block;
+		font-size: 20px;
+		line-height: 1.15;
+	}
+	.kpi span {
+		font-size: 11.5px;
+		color: var(--ink-3);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	/* ===== Card & table ===== */
+	.card {
+		background: var(--card);
+		border: 1px solid var(--line);
+		border-radius: var(--radius);
+		box-shadow: var(--shadow);
+	}
+	.card.pad {
+		padding: 1.2rem;
+	}
+	.table-wrap {
+		overflow: hidden;
 	}
 	table {
 		width: 100%;
@@ -769,233 +1366,437 @@
 	th,
 	td {
 		text-align: left;
-		padding: 0.75rem 0.85rem;
+		padding: 0.8rem 1rem;
 		border-bottom: 1px solid var(--line-soft);
-		vertical-align: top;
+		vertical-align: middle;
 	}
 	th {
-		font-size: 11px;
+		font-size: 10.5px;
+		font-weight: 600;
 		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		color: var(--ink-2);
+		letter-spacing: 0.07em;
+		color: var(--ink-3);
+		background: #f9fafb;
 	}
-	.links {
-		display: flex;
-		gap: 0.6rem;
-		flex-wrap: wrap;
-		margin-top: 0.3rem;
-		font-size: 12px;
+	tbody tr:last-child td {
+		border-bottom: 0;
 	}
-	.links a,
+	tbody tr:hover {
+		background: #fafbff;
+	}
+	tr.selected {
+		background: var(--accent-soft) !important;
+	}
+	.ta-r {
+		text-align: right;
+	}
 	.lnk {
 		display: inline-flex;
 		align-items: center;
 		gap: 0.25em;
-		color: var(--ink-2);
-		text-decoration: none;
 		background: transparent;
 		border: 0;
 		cursor: pointer;
-		font-size: 12px;
+		font-family: inherit;
+		font-size: 12.5px;
+		color: var(--ink-2);
 		padding: 0;
 	}
-	.badge {
-		display: inline-block;
-		border-radius: 999px;
-		padding: 0.15em 0.6em;
-		font-size: 11px;
-		background: var(--paper-2);
-		border: 1px solid var(--line);
-	}
-	.badge.active {
-		background: #d1fae5;
-		color: #065f46;
-		border-color: #a7f3d0;
-	}
-	tr.selected {
-		background: #f0fdf4;
-	}
+	.lnk strong,
 	.lnk.strong {
 		font-weight: 600;
+		color: var(--accent-strong);
 	}
-	.detail {
-		margin-top: 1.2rem;
-		background: var(--card);
+	.lnk:hover {
+		color: var(--accent-strong);
+		text-decoration: underline;
+	}
+	.links {
+		display: flex;
+		gap: 0.8rem;
+		flex-wrap: wrap;
+		margin-top: 0.35rem;
+	}
+	.links a,
+	.links .lnk {
+		font-size: 11.5px;
+		color: var(--ink-3);
+		text-decoration: none;
+	}
+	.couple span:first-child {
+		font-weight: 600;
+		color: var(--ink);
+	}
+	.couple i {
+		font-style: normal;
+		color: var(--ink-3);
+		padding: 0 0.15em;
+	}
+	.tag {
+		display: inline-block;
+		margin-top: 0.25rem;
+		font-size: 10.5px;
+		font-weight: 600;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: var(--accent-strong);
+		background: var(--accent-soft);
+		border: 1px solid #e0e4ff;
+		border-radius: 6px;
+		padding: 0.12em 0.55em;
+	}
+	.pill {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4em;
+		border-radius: 999px;
+		padding: 0.2em 0.7em;
+		font-size: 11.5px;
+		font-weight: 500;
+		background: var(--line-soft);
+		color: var(--ink-2);
 		border: 1px solid var(--line);
-		border-radius: 16px;
-		padding: 1.2rem;
+		text-transform: capitalize;
 	}
+	.pill .dot {
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: var(--ink-3);
+	}
+	.pill.ok {
+		background: var(--ok-bg);
+		color: var(--ok);
+		border-color: #a7f3d0;
+	}
+	.pill.ok .dot {
+		background: var(--ok);
+	}
+	.pill.warn {
+		background: var(--warn-bg);
+		color: var(--warn);
+		border-color: #fde68a;
+	}
+	.pill.warn .dot {
+		background: var(--warn);
+	}
+	.pill.muted-pill .dot {
+		background: var(--ink-3);
+	}
+	.pin {
+		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+		font-size: 12px;
+		letter-spacing: 0.06em;
+		color: var(--ink-2);
+		background: var(--line-soft);
+		border-radius: 6px;
+		padding: 0.15em 0.5em;
+	}
+	.actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.35rem;
+	}
+
+	/* ===== Buttons & icons ===== */
+	.btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.45em;
+		border-radius: 10px;
+		padding: 0.55em 1em;
+		font-size: 13px;
+		font-weight: 600;
+		font-family: inherit;
+		cursor: pointer;
+		border: 1px solid transparent;
+		transition: background 0.12s ease, box-shadow 0.12s ease, transform 0.05s ease;
+		text-decoration: none;
+	}
+	.btn:active {
+		transform: translateY(1px);
+	}
+	.btn:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+	.btn-primary {
+		background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+		color: #fff;
+		box-shadow: 0 1px 3px rgba(79, 70, 229, 0.35);
+	}
+	.btn-primary:hover {
+		box-shadow: 0 3px 8px rgba(79, 70, 229, 0.4);
+	}
+	.btn-ghost {
+		background: var(--card);
+		border-color: var(--line);
+		color: var(--ink-2);
+	}
+	.btn-ghost:hover {
+		border-color: #d0d5dd;
+		color: var(--ink);
+		background: #f9fafb;
+	}
+	.btn.sm {
+		padding: 0.35em 0.8em;
+		font-size: 12px;
+	}
+	.icon-btn {
+		width: 34px;
+		height: 34px;
+		border-radius: 9px;
+		border: 1px solid var(--line);
+		background: var(--card);
+		display: grid;
+		place-items: center;
+		cursor: pointer;
+		color: var(--ink-2);
+		transition: background 0.12s ease, color 0.12s ease;
+	}
+	.icon-btn:hover {
+		background: var(--line-soft);
+		color: var(--ink);
+	}
+	.icon-btn.danger {
+		color: var(--danger);
+	}
+	.icon-btn.danger:hover {
+		background: var(--danger-bg);
+		border-color: #fecaca;
+	}
+	.icon-btn.sm {
+		width: 30px;
+		height: 30px;
+	}
+	.icon-btn:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+	}
+
+	/* ===== Detail head ===== */
 	.detail-head {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		gap: 0.8rem;
-		margin-bottom: 0.8rem;
+		gap: 1rem;
+		padding: 1.1rem 1.2rem;
+		margin-bottom: 1.1rem;
+		flex-wrap: wrap;
 	}
-	.detail-head h2 {
-		margin: 0;
+	.dh-left {
+		display: flex;
+		align-items: center;
+		gap: 0.85rem;
+	}
+	.dh-mono {
+		flex: none;
+		width: 46px;
+		height: 46px;
+		border-radius: 13px;
+		display: grid;
+		place-items: center;
 		font-size: 16px;
+		font-weight: 700;
+		color: #fff;
+		background: linear-gradient(135deg, var(--accent), #8b5cf6);
+		box-shadow: 0 3px 8px rgba(99, 91, 255, 0.3);
+	}
+	.detail-head h1 {
+		margin: 0;
+		font-size: 18px;
+		font-weight: 700;
+	}
+	.detail-head h1 i {
+		font-style: normal;
+		color: var(--ink-3);
+		padding: 0 0.2em;
+	}
+	.dh-sub {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		flex-wrap: wrap;
+		margin: 0.3rem 0 0;
+	}
+	.dh-sub code {
+		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+		font-size: 12px;
+		color: var(--ink-2);
+		background: var(--line-soft);
+		border-radius: 6px;
+		padding: 0.15em 0.5em;
+	}
+	.dh-actions {
+		display: flex;
+		gap: 0.5rem;
+		flex-wrap: wrap;
+	}
+
+	/* ===== Overview ===== */
+	.ov-cards {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 0.9rem;
+		margin-bottom: 1.1rem;
+	}
+	.ov-card {
+		background: var(--card);
+		border: 1px solid var(--line);
+		border-radius: var(--radius);
+		padding: 1rem;
+		text-align: center;
+		box-shadow: var(--shadow);
+	}
+	.ov-card strong {
+		display: block;
+		font-size: 24px;
+		line-height: 1.2;
 		color: var(--ink);
 	}
-	.tabs {
+	.ov-card span {
+		font-size: 11.5px;
+		color: var(--ink-3);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+	.sec-title {
 		display: flex;
-		gap: 0.4rem;
-		flex-wrap: wrap;
-		margin-bottom: 0.8rem;
-	}
-	.tabs button {
-		border: 1px solid var(--line);
-		background: var(--paper);
-		border-radius: 999px;
-		padding: 0.35em 0.85em;
-		font-size: 12px;
-		cursor: pointer;
-		display: inline-flex;
 		align-items: center;
-		gap: 0.3em;
+		gap: 0.45em;
+		margin: 0 0 0.8rem;
+		font-size: 14px;
+		font-weight: 700;
+		color: var(--ink);
 	}
-	.tabs button.active {
-		background: var(--ink);
-		color: #fff;
-		border-color: var(--ink);
+	.sec-title.sub {
+		margin-top: 1rem;
+		font-size: 12.5px;
+		color: var(--ink-2);
 	}
-	.overview {
-		display: grid;
-		gap: 0.5rem;
-		font-size: 13px;
+	.count-pill {
+		font-size: 11px;
+		font-weight: 600;
+		color: var(--accent-strong);
+		background: var(--accent-soft);
+		border-radius: 999px;
+		padding: 0.1em 0.6em;
 	}
 	.export-row {
 		display: flex;
-		gap: 0.5rem;
 		align-items: center;
+		gap: 0.5rem;
+		flex-wrap: wrap;
 	}
 	.export-row select {
 		border: 1px solid var(--line);
-		border-radius: 8px;
-		padding: 0.4em 0.6em;
+		border-radius: 10px;
+		padding: 0.5em 0.7em;
+		font-size: 13px;
+		font-family: inherit;
+		background: var(--card);
+		color: var(--ink);
 	}
+
+	/* ===== Lists (tamu & ucapan) ===== */
 	.list {
 		display: grid;
-		gap: 0.5rem;
+		gap: 0.55rem;
+	}
+	.list-head {
+		margin-bottom: 0.2rem;
 	}
 	.list-item {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 0.5em 0.7em;
+		gap: 0.8rem;
+		padding: 0.6rem 0.8rem;
 		border: 1px solid var(--line-soft);
-		border-radius: 10px;
+		border-radius: 11px;
+		background: #fff;
+	}
+	.list-item:hover {
+		border-color: var(--line);
+	}
+	.li-left {
+		display: flex;
+		align-items: center;
+		gap: 0.65rem;
+		min-width: 0;
+	}
+	.li-avatar {
+		flex: none;
+		width: 30px;
+		height: 30px;
+		border-radius: 50%;
+		display: grid;
+		place-items: center;
 		font-size: 13px;
+		font-weight: 700;
+		color: var(--ink-2);
+		background: var(--line-soft);
+	}
+	.li-avatar.accent {
+		background: var(--accent-soft);
+		color: var(--accent-strong);
+	}
+	.li-name {
+		font-size: 13.5px;
+		color: var(--ink);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 	.wish-item {
 		border: 1px solid var(--line-soft);
-		border-radius: 10px;
-		padding: 0.6em 0.8em;
-		font-size: 13px;
+		border-radius: 11px;
+		padding: 0.75rem 0.85rem;
+		background: #fff;
+	}
+	.wish-item:hover {
+		border-color: var(--line);
+	}
+	.wish-top {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.8rem;
 	}
 	.wish-msg {
-		margin: 0.3rem 0 0;
+		margin: 0.5rem 0 0 2.55rem;
 		color: var(--ink-2);
+		font-size: 13px;
+		white-space: pre-wrap;
 	}
+	.empty-note {
+		margin: 0.3rem 0 0;
+		font-size: 13px;
+	}
+
+	/* ===== Upload ===== */
 	.upload {
 		display: grid;
-		gap: 0.6rem;
-	}
-	.pin {
-		letter-spacing: 0.08em;
-	}
-	.actions {
-		display: flex;
-		gap: 0.35rem;
-	}
-	.ic {
-		width: 32px;
-		height: 32px;
-		border-radius: 50%;
-		border: 1px solid var(--line);
-		background: #fff;
-		display: grid;
-		place-items: center;
-		cursor: pointer;
-	}
-	.ic.danger {
-		color: #b91c1c;
-	}
-	.modal {
-		position: fixed;
-		inset: 0;
-		z-index: 50;
-		display: grid;
-		place-items: center;
-		padding: 1rem;
-	}
-	.backdrop {
-		position: absolute;
-		inset: 0;
-		background: rgba(0, 0, 0, 0.45);
-		border: 0;
-	}
-	.modal-card {
-		position: relative;
-		background: var(--card);
-		border-radius: 18px;
-		padding: 1.4rem;
-		width: min(100%, 520px);
-		display: grid;
-		gap: 0.8rem;
-		box-shadow: var(--shadow-2);
-	}
-	.modal-card h2 {
-		margin: 0;
-		font-family: var(--font-serif);
-		color: var(--ink);
-		font-size: 18px;
-	}
-	.modal-card label span {
-		display: block;
-		font-size: 12px;
-		font-weight: 600;
-		letter-spacing: 0.06em;
-		text-transform: uppercase;
-		color: var(--ink-2);
-		margin-bottom: 0.3rem;
-	}
-	.modal-card input,
-	.modal-card select {
-		width: 100%;
-		border: 1px solid var(--line);
-		border-radius: 10px;
-		padding: 0.65em 0.9em;
-		font-size: 14px;
-		box-sizing: border-box;
-	}
-	.grid2 {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
 		gap: 0.7rem;
 	}
-	.modal-actions {
+	.upload-row {
 		display: flex;
-		justify-content: flex-end;
-		gap: 0.6rem;
-		margin-top: 0.4rem;
-	}
-	.hint2 {
-		margin: 0;
-		font-size: 11px;
-		color: var(--ink-3);
+		gap: 0.5rem;
+		flex-wrap: wrap;
+		align-items: center;
 	}
 	.gallery-grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-		gap: 0.6rem;
-		margin-top: 0.6rem;
+		grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+		gap: 0.7rem;
+		margin-top: 0.3rem;
 	}
 	.gcell {
 		border: 1px solid var(--line);
-		border-radius: 10px;
+		border-radius: 12px;
 		overflow: hidden;
-		background: var(--paper);
+		background: #fff;
 	}
 	.gcell img {
 		width: 100%;
@@ -1005,23 +1806,50 @@
 	}
 	.gact {
 		display: flex;
-		gap: 0.25rem;
-		padding: 0.35rem;
+		gap: 0.3rem;
+		padding: 0.4rem;
 		justify-content: center;
 	}
-	.ic.sm {
-		width: 28px;
-		height: 28px;
-		font-size: 13px;
+	.hint {
+		margin: 0.2rem 0 0;
+		font-size: 12.5px;
+		color: var(--ink-3);
 	}
+	.hint.ok {
+		color: var(--ok);
+	}
+	.hint.err-text {
+		color: var(--danger);
+	}
+
+	/* ===== Konten ===== */
 	.konten {
 		display: grid;
-		gap: 0.9rem;
+		gap: 1rem;
 	}
-	.konten h3 {
-		margin: 1.1rem 0 0.3rem;
-		font-size: 14px;
-		color: var(--ink);
+	.k-sec {
+		display: grid;
+		gap: 0.8rem;
+	}
+	.konten-savebar {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		flex-wrap: wrap;
+		position: sticky;
+		top: 72px;
+		z-index: 20;
+	}
+	.sticky-save {
+		position: sticky;
+		bottom: 1rem;
+		display: flex;
+		justify-content: flex-end;
+		z-index: 20;
+	}
+	.sticky-save .btn {
+		box-shadow: var(--shadow-lg);
 	}
 	.konten-row {
 		display: grid;
@@ -1029,12 +1857,12 @@
 		gap: 0.5rem;
 		align-items: start;
 		border: 1px solid var(--line-soft);
-		border-radius: 10px;
+		border-radius: 11px;
 		padding: 0.6rem;
 	}
-	@media (min-width: 560px) {
+	@media (min-width: 640px) {
 		.konten-row {
-			grid-template-columns: 1fr 1fr 1fr auto;
+			grid-template-columns: 1fr 1fr 1fr 1fr auto;
 		}
 	}
 	.konten-row input,
@@ -1045,14 +1873,22 @@
 		border-radius: 8px;
 		padding: 0.45em 0.65em;
 		font-size: 13px;
+		font-family: inherit;
+		color: var(--ink);
+		background: #fff;
 		box-sizing: border-box;
 	}
-	.chk {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.4em;
-		font-size: 13px;
-		color: var(--ink-2);
+	.konten-row input:focus,
+	.konten-row select:focus,
+	.konten-row textarea:focus,
+	.konten label input:focus,
+	.konten label textarea:focus,
+	.konten label select:focus,
+	.modal-card input:focus,
+	.modal-card select:focus {
+		outline: 2px solid var(--accent);
+		outline-offset: -1px;
+		border-color: var(--accent);
 	}
 	.konten label span {
 		display: block;
@@ -1060,17 +1896,233 @@
 		font-weight: 600;
 		letter-spacing: 0.06em;
 		text-transform: uppercase;
-		color: var(--ink-2);
-		margin-bottom: 0.25rem;
+		color: var(--ink-3);
+		margin-bottom: 0.3rem;
 	}
 	.konten label input,
 	.konten label textarea,
 	.konten label select {
 		width: 100%;
 		border: 1px solid var(--line);
-		border-radius: 8px;
+		border-radius: 9px;
 		padding: 0.55em 0.8em;
 		font-size: 13px;
+		font-family: inherit;
+		color: var(--ink);
+		background: #fff;
 		box-sizing: border-box;
+	}
+	.chk {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5em;
+		font-size: 13px;
+		color: var(--ink-2);
+		cursor: pointer;
+	}
+	.grid2 {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.7rem;
+	}
+	@media (max-width: 640px) {
+		.grid2 {
+			grid-template-columns: 1fr;
+		}
+	}
+
+	/* ===== Modal ===== */
+	.modal {
+		position: fixed;
+		inset: 0;
+		z-index: 60;
+		display: grid;
+		place-items: center;
+		padding: 1rem;
+		background: rgba(16, 24, 40, 0.55);
+		backdrop-filter: blur(3px);
+	}
+	.modal-x {
+		position: absolute;
+		top: 1.1rem;
+		right: 1.1rem;
+		width: 34px;
+		height: 34px;
+		border-radius: 9px;
+		border: 1px solid var(--line);
+		background: var(--card);
+		color: var(--ink-2);
+		cursor: pointer;
+		display: grid;
+		place-items: center;
+		z-index: 1;
+	}
+	.modal-x:hover {
+		color: var(--ink);
+	}
+	.modal-card {
+		position: relative;
+		background: var(--card);
+		border-radius: 18px;
+		padding: 1.5rem;
+		width: min(100%, 540px);
+		display: grid;
+		gap: 0.85rem;
+		box-shadow: var(--shadow-lg);
+		max-height: calc(100svh - 2rem);
+		overflow-y: auto;
+	}
+	.modal-card h2 {
+		margin: 0 0 0.2rem;
+		font-size: 18px;
+		font-weight: 700;
+	}
+	.modal-card label span {
+		display: block;
+		font-size: 11px;
+		font-weight: 600;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--ink-3);
+		margin-bottom: 0.3rem;
+	}
+	.modal-card input,
+	.modal-card select {
+		width: 100%;
+		border: 1px solid var(--line);
+		border-radius: 10px;
+		padding: 0.65em 0.9em;
+		font-size: 14px;
+		font-family: inherit;
+		color: var(--ink);
+		background: #fff;
+		box-sizing: border-box;
+	}
+	.modal-card input:disabled {
+		background: var(--line-soft);
+		color: var(--ink-3);
+	}
+	.modal-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.6rem;
+		margin-top: 0.5rem;
+	}
+
+	/* ===== Feedback ===== */
+	.alert {
+		display: flex;
+		align-items: center;
+		gap: 0.5em;
+		border-radius: 10px;
+		padding: 0.6em 0.9em;
+		font-size: 13px;
+	}
+	.alert.err {
+		color: var(--danger);
+		background: var(--danger-bg);
+		border: 1px solid #fecaca;
+	}
+	.toast {
+		position: fixed;
+		bottom: 1.2rem;
+		right: 1.2rem;
+		z-index: 80;
+		display: flex;
+		align-items: center;
+		gap: 0.5em;
+		background: #111827;
+		color: #fff;
+		border-radius: 12px;
+		padding: 0.7em 1.1em;
+		font-size: 13px;
+		box-shadow: var(--shadow-lg);
+		animation: toast-in 0.18s ease;
+	}
+	.toast.err {
+		background: var(--danger);
+	}
+	@keyframes toast-in {
+		from {
+			opacity: 0;
+			transform: translateY(8px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+	.empty {
+		background: var(--card);
+		border: 1px dashed var(--line);
+		border-radius: var(--radius);
+		padding: 2.2rem 1.4rem;
+		text-align: center;
+		color: var(--ink-3);
+	}
+	.empty strong {
+		display: block;
+		font-size: 15px;
+		color: var(--ink-2);
+		margin-bottom: 0.25rem;
+	}
+	.empty p {
+		margin: 0;
+		font-size: 13px;
+	}
+	.muted {
+		color: var(--ink-3);
+	}
+
+	/* ===== Responsive ===== */
+	@media (max-width: 960px) {
+		.body {
+			grid-template-columns: 1fr;
+		}
+		.burger {
+			display: grid;
+		}
+		.sidebar {
+			position: fixed;
+			top: 60px;
+			bottom: 0;
+			left: 0;
+			width: 260px;
+			min-height: 0;
+			z-index: 50;
+			transform: translateX(-100%);
+			transition: transform 0.2s ease;
+			overflow-y: auto;
+		}
+		.sidebar.open {
+			transform: translateX(0);
+		}
+		.side-overlay {
+			display: block;
+			position: fixed;
+			inset: 60px 0 0 0;
+			z-index: 45;
+			background: rgba(16, 24, 40, 0.5);
+			border: 0;
+		}
+		.main {
+			padding: 1.1rem 1rem 3rem;
+		}
+	}
+	@media (max-width: 720px) {
+		.user-meta {
+			display: none;
+		}
+		.kpis,
+		.ov-cards {
+			grid-template-columns: 1fr 1fr;
+		}
+		.page-head {
+			flex-direction: column;
+			align-items: flex-start;
+		}
+		.konten-savebar {
+			position: static;
+		}
 	}
 </style>
