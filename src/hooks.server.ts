@@ -13,14 +13,17 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 
 	const pathname = event.url.pathname;
-	if (pathname.startsWith('/admin')) {
-		const isLogin = pathname === '/admin/login' || pathname.startsWith('/admin/login/');
+	if (pathname.startsWith('/admin') || pathname.startsWith('/api/admin')) {
 		const isApi = pathname.startsWith('/api/admin');
-		if (!isLogin && !event.locals.adminAuthed) {
-			if (isApi) {
+		if (isApi) {
+			if (!event.locals.adminAuthed) {
 				return new Response(JSON.stringify({ message: 'Unauthorized' }), { status: 401, headers: { 'content-type': 'application/json' } });
 			}
-			return Response.redirect(new URL('/admin/login', event.url).toString(), 302);
+		} else {
+			const isLogin = pathname === '/admin/login' || pathname.startsWith('/admin/login/');
+			if (!isLogin && !event.locals.adminAuthed) {
+				return Response.redirect(new URL('/admin/login', event.url).toString(), 302);
+			}
 		}
 	}
 

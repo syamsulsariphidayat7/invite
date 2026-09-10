@@ -29,7 +29,9 @@
 		PanelLeftOpen,
 		Download,
 		Moon,
-		Sun
+		Sun,
+		Database,
+		ArchiveRestore
 	} from 'lucide-svelte';
 
 	interface InvitationItem {
@@ -65,7 +67,7 @@
 	let copied = $state<string | null>(null);
 
 	let selected = $state<string | null>(null);
-	let tab = $state<'overview' | 'tamu' | 'ucapan' | 'foto' | 'konten' | 'export'>('overview');
+	let tab = $state<'overview' | 'tamu' | 'ucapan' | 'foto' | 'konten' | 'export' | 'backup'>('overview');
 	let detailGuests = $state<GuestRow[]>([]);
 	let detailWishes = $state<WishRow[]>([]);
 	let detailLoading = $state(false);
@@ -84,6 +86,7 @@
 	let searchQ = $state('');
 	let statusF = $state<'all' | 'active' | 'draft' | 'expired'>('all');
 
+	let backupEl = $state<HTMLInputElement | null>(null);
 	let toast = $state<{ msg: string; type: 'ok' | 'err' } | null>(null);
 	let toastTimer: ReturnType<typeof setTimeout> | null = null;
 	function notify(msg: string, type: 'ok' | 'err' = 'ok') {
@@ -98,7 +101,8 @@
 		ucapan: 'Ucapan',
 		foto: 'Foto',
 		konten: 'Konten',
-		export: 'Export'
+		export: 'Export',
+		backup: 'Backup'
 	};
 
 	function templateLabel(id: string): string {
@@ -332,6 +336,8 @@
 		sidebarOpen = false;
 		userMenu = false;
 	}
+
+
 
 	let kontenSaving = $state(false);
 	let kontenMsg = $state('');
@@ -708,6 +714,83 @@
 		a.download = `${selected}-${exportType}.${fmt}`;
 		a.click();
 	}
+
+	let backupBusy = $state(false);
+	let restoreBusy = $state(false);
+	let restoreResult = $state<{ invitations: { inserted: number; skipped: number }; guest_wishes: { inserted: number; skipped: number }; invitation_guests: { inserted: number; skipped: number } } | null>(null);
+	let restoreFile = $state<File | null>(null);
+	let restorePreview = $state<{ counts: { invitations: number; guest_wishes: number; invitation_guests: number }; created_at: string } | null>(null);
+
+	async function downloadBackup() {
+		backupBusy = true;
+		restoreResult = null;
+		try {
+			const res = await fetch('/api/admin/backup');
+			if (!res.ok) {
+				const j = await res.json().catch(() => null);
+				notify(j?.message ?? 'Backup gagal.', 'err');
+				return;
+			}
+			const blob = await res.blob();
+			const cd = res.headers.get('content-disposition') ?? '';
+			const m = cd.match(/filename="?([^"]+)"?/);
+			const name = m ? m[1] : `backup-${new Date().toISOString().slice(0, 10)}.json`;
+			const a = document.createElement('a');
+			a.href = URL.createObjectURL(blob);
+			a.download = name;
+			a.click();
+			setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+			notify(`Backup terdownload: ${name}`);
+		} catch {
+			notify('Backup gagal.', 'err');
+		} finally {
+			backupBusy = false;
+		}
+	}
+
+	async function onRestorePick(e: Event) {
+		const input = e.target as HTMLInputElement;
+		const f = input.files?.[0] ?? null;
+		restoreFile = f;
+		restorePreview = null;
+		restoreResult = null;
+		if (!f) return;
+		try {
+			const text = await f.text();
+			const j = JSON.parse(text) as Record<string, unknown>;
+			const counts = (j.counts as Record<string, number> | undefined) ?? null;
+			if (counts) restorePreview = { counts: { invitations: counts.invitations ?? 0, guest_wishes: counts.guest_wishes ?? 0, invitation_guests: counts.invitation_guests ?? 0 }, created_at: String(j.created_at ?? '') };
+		} catch {}
+	}
+
+	async function doRestore() {
+		if (!restoreFile) {
+			notify('Pilih file backup (.json) dulu.', 'err');
+			return;
+		}
+		if (!confirm('Restore akan menambahkan data yang belum ada (merge, skip duplikat). Lanjutkan?')) return;
+		restoreBusy = true;
+		restoreResult = null;
+		try {
+			const text = await restoreFile.text();
+			let payload: unknown;
+			try { payload = JSON.parse(text); } catch { notify('File JSON tidak valid.', 'err'); return; }
+			const res = await fetch('/api/admin/backup', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+			const j = await res.json().catch(() => null);
+			if (!res.ok) {
+				notify(j?.message ?? 'Restore gagal.', 'err');
+				return;
+			}
+			restoreResult = j.result;
+			notify(`Restore selesai — baru: ${j.result.invitations.inserted} undangan, ${j.result.guest_wishes.inserted} ucapan, ${j.result.invitation_guests.inserted} tamu.`);
+			await load();
+			if (selected) await openDetail(selected, tab);
+		} catch {
+			notify('Restore gagal.', 'err');
+		} finally {
+			restoreBusy = false;
+		}
+	}
 </script>
 
 <svelte:head><title>Panel Admin — Undangan</title></svelte:head>
@@ -767,9 +850,10 @@
 		<aside class="sidebar" class:open={sidebarOpen} class:rail={sidebarCollapsed}>
 			<p class="side-label">Menu Utama</p>
 			<nav class="side-nav">
-				<button class:active={!selected} onclick={closeDetail} title="Kembali ke daftar undangan">
+				<button class:active={!selected && tab !== 'backup'} onclick={closeDetail} title="Kembali ke daftar undangan">
 					<LayoutDashboard size={16} /><span class="nav-txt">Daftar Undangan</span>
 				</button>
+				<button class:active={!selected && tab === 'backup'} onclick={() => { selected = null; tab = 'backup'; sidebarOpen = false; }} title="Backup & restore seluruh database (download lokal)"><Database size={15} /><span class="nav-txt">Backup</span></button>
 			</nav>
 
 			{#if selected}
@@ -807,13 +891,54 @@
 					<button class="crumb-link" onclick={closeDetail}>{selected}</button>
 					<span class="crumb-sep">/</span>
 					<span class="crumb-cur">{tabLabels[tab]}</span>
+				{:else if tab === 'backup'}
+					<span class="crumb-sep">/</span>
+					<span class="crumb-cur">Backup</span>
 				{:else}
 					<span class="crumb-sep">/</span>
 					<span class="crumb-cur">Daftar</span>
 				{/if}
 			</nav>
 
-			{#if !selected}
+			{#if !selected && tab === 'backup'}
+				<header class="page-head">
+					<div>
+						<h1>Backup & Restore</h1>
+						<p>Backup seluruh database (semua undangan, ucapan, tamu) ke JSON di komputer lokal — tanpa simpan di server.</p>
+					</div>
+					<button class="btn btn-primary" onclick={downloadBackup} disabled={backupBusy}><Download size={14} /> {backupBusy ? 'Memproses…' : 'Backup Sekarang'}</button>
+				</header>
+				{#if err}
+					<div class="alert err"><X size={15} /> {err}</div>
+				{/if}
+				<div class="card pad backup">
+					<h3 class="sec-title"><Database size={15} /> Backup — simpan ke lokal</h3>
+					<p class="hint">Mencakup <strong>semua</strong> undangan + ucapan + tamu (tanpa media foto). File JSON didownload ke komputermu. Nama: <code>backup-YYYY-MM-DD.json</code></p>
+					<div class="backup-actions">
+						<button class="btn btn-primary" onclick={downloadBackup} disabled={backupBusy}><Download size={14} /> {backupBusy ? 'Memproses…' : 'Backup Sekarang (Download)'}</button>
+						<span class="hint">Versi: 1 · {counts.all} undangan saat ini</span>
+					</div>
+					<hr class="sep" />
+					<h3 class="sec-title sub"><ArchiveRestore size={14} /> Restore dari file</h3>
+					<p class="hint">Pilih file <code>backup-*.json</code> hasil download sebelumnya. Mode <code>merge</code> — data baru ditambahkan, yang sudah ada dilewati.</p>
+					<div class="restore-row">
+						<input bind:this={backupEl} type="file" accept=".json,application/json" onchange={onRestorePick} />
+						<button class="btn btn-ghost" onclick={doRestore} disabled={!restoreFile || restoreBusy}>{restoreBusy ? 'Memproses…' : 'Restore (Merge)'}</button>
+						{#if restoreFile}<button class="btn btn-ghost sm" onclick={() => { if (backupEl) backupEl.value = ''; restoreFile = null; restorePreview = null; restoreResult = null; }}>Clear</button>{/if}
+					</div>
+					{#if restorePreview}
+						<p class="hint ok">Pratinjau: {restorePreview.counts.invitations} undangan · {restorePreview.counts.guest_wishes} ucapan · {restorePreview.counts.invitation_guests} tamu — dibuat {restorePreview.created_at ? new Date(restorePreview.created_at).toLocaleString('id-ID') : '—'}</p>
+					{/if}
+					{#if restoreResult}
+						<div class="backup-result">
+							<div><strong>Undangan:</strong> {restoreResult.invitations.inserted} baru / {restoreResult.invitations.skipped} skip</div>
+							<div><strong>Ucapan:</strong> {restoreResult.guest_wishes.inserted} baru / {restoreResult.guest_wishes.skipped} skip</div>
+							<div><strong>Tamu:</strong> {restoreResult.invitation_guests.inserted} baru / {restoreResult.invitation_guests.skipped} skip</div>
+						</div>
+					{/if}
+					<p class="hint">CLI: <code>pnpm backup</code> → <code>backups/</code> · <code>pnpm restore backups/backup-*.json</code></p>
+				</div>
+			{:else if !selected}
 				<header class="page-head">
 					<div>
 						<h1>Daftar Undangan</h1>
@@ -3238,5 +3363,45 @@
 	.shell.dark .inv-actions {
 		background: #16213a;
 		border-color: var(--line);
+	}
+
+	/* ===== Backup ===== */
+	.backup {
+		display: grid;
+		gap: 0.8rem;
+	}
+	.backup-actions {
+		display: flex;
+		align-items: center;
+		gap: 0.7rem;
+		flex-wrap: wrap;
+	}
+	.sep {
+		border: 0;
+		border-top: 1px solid var(--line-soft);
+		margin: 0.2rem 0;
+	}
+	.restore-row {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		flex-wrap: wrap;
+	}
+	.restore-row input[type='file'] {
+		font-size: 13px;
+		color: var(--ink-2);
+	}
+	.backup-result {
+		display: grid;
+		gap: 0.3rem;
+		padding: 0.8rem 1rem;
+		border: 1px solid var(--line);
+		border-radius: 10px;
+		background: var(--line-soft);
+		font-size: 13px;
+		color: var(--ink-2);
+	}
+	.backup-result strong {
+		color: var(--ink);
 	}
 </style>
