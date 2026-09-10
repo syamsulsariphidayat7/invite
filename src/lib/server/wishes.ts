@@ -80,23 +80,32 @@ async function init(): Promise<boolean> {
 
 /** Daftar ucapan terbaru (maks `limit` + offset untuk paging). */
 export async function listWishes(weddingSlug: string, limit = 30, offset = 0): Promise<Wish[]> {
+	return (await listWishesWithCount(weddingSlug, limit, offset)).wishes;
+}
+
+/** Daftar ucapan + total dalam SATU query (COUNT(*) OVER()) — hemat round-trip DB. */
+export async function listWishesWithCount(
+	weddingSlug: string,
+	limit = 30,
+	offset = 0
+): Promise<{ wishes: Wish[]; total: number }> {
 	const lim = Math.min(100, Math.max(1, Math.floor(limit) || 30));
 	const off = Math.max(0, Math.floor(offset) || 0);
 	if (!(await init())) {
-		return inMemory.slice(off, off + lim);
+		return { wishes: inMemory.slice(off, off + lim), total: inMemory.length };
 	}
 	try {
 		const rows = (await db()`
-			SELECT id, name, attendance, message, guests, created_at
+			SELECT id, name, attendance, message, guests, created_at, COUNT(*) OVER()::int AS total
 			FROM guest_wishes
 			WHERE wedding = ${weddingSlug}
 			ORDER BY created_at DESC
 			LIMIT ${lim} OFFSET ${off}
-		`) as unknown as Row[];
-		return rows.map(rowToWish);
+		`) as unknown as (Row & { total: number })[];
+		return { wishes: rows.map(rowToWish), total: Number(rows[0]?.total ?? 0) };
 	} catch (e) {
 		console.error('[wishes] Gagal membaca database:', e);
-		return inMemory.slice(off, off + lim);
+		return { wishes: inMemory.slice(off, off + lim), total: inMemory.length };
 	}
 }
 

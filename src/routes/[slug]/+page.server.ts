@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { listWishes, countWishes } from '$lib/server/wishes';
+import { listWishesWithCount } from '$lib/server/wishes';
 import { getInvitation } from '$lib/server/invitations';
 import { resolveWedding } from '$lib/data/resolve';
 import { DEFAULT_TEMPLATE } from '$lib/layouts/meta';
@@ -13,7 +13,7 @@ export const load = async ({ params, url }) => {
 	if (inv && inv.status === 'draft' && !isPreview) error(404, 'Undangan belum tersedia.');
 	if (inv && inv.status === 'expired') error(410, 'Undangan telah berakhir.');
 	const slug = inv?.subdomain ?? params.slug;
-	const [wishes, total] = await Promise.all([listWishes(slug, 30), countWishes(slug)]);
+	const { wishes, total } = await listWishesWithCount(slug, 30);
 	const gallery = inv?.dataJson && Array.isArray((inv.dataJson as Record<string, unknown>).gallery) ? ((inv.dataJson as Record<string, unknown>).gallery as string[]) : null;
 	const resolved = resolveWedding((inv?.dataJson as Record<string, unknown>) ?? null);
 	const template = (inv?.template?.trim() || DEFAULT_TEMPLATE).toLowerCase();

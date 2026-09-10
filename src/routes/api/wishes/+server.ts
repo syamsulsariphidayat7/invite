@@ -1,5 +1,5 @@
 import { json, error } from '@sveltejs/kit';
-import { addWish, countWishes, listWishes } from '$lib/server/wishes';
+import { addWish, listWishesWithCount } from '$lib/server/wishes';
 import { getInvitation } from '$lib/server/invitations';
 import { wedding } from '$lib/data/wedding';
 import { checkRateLimit, clientKey } from '$lib/server/rateLimit';
@@ -14,8 +14,11 @@ export async function GET({ url }) {
 	const inv = await getInvitation(slug).catch(() => null);
 	if (!inv && slug !== FALLBACK_SLUG) error(404, 'Undangan tidak ditemukan.');
 	const key = inv?.subdomain ?? slug;
-	const [wishes, total] = await Promise.all([listWishes(key, limit, offset), countWishes(key)]);
-	return json({ wishes, total });
+	const { wishes, total } = await listWishesWithCount(key, limit, offset);
+	return json(
+		{ wishes, total },
+		{ headers: { 'cache-control': 'public, s-maxage=15, stale-while-revalidate=60' } }
+	);
 }
 
 export async function POST({ request, getClientAddress, url }) {

@@ -13,7 +13,8 @@ export default defineConfig({
 
 			// Runtime eksplisit supaya build lokal tidak terikat versi Node mesin
 			// (Vercel menjalankan fungsi Node sesuai runtime yang dipilih di sini).
-			adapter: adapter({ runtime: 'nodejs24.x' })
+			// Region sin1 (Singapore) — satu region dengan Supabase ap-southeast-1.
+			adapter: adapter({ runtime: 'nodejs24.x', regions: ['sin1'] })
 		})
 	]
 });
