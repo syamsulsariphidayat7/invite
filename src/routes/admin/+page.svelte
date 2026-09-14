@@ -662,13 +662,61 @@
 		pendingFiles = [];
 		pendingPreviews = [];
 	}
+	async function compressImage(file: File): Promise<File> {
+		if (!file.type.startsWith('image/')) return file;
+		try {
+			const toBlob = (cv: HTMLCanvasElement): Promise<Blob | null> =>
+				new Promise((r) => cv.toBlob(r as BlobCallback, 'image/jpeg', 0.82));
+			try {
+				const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' } as ImageBitmapOptions);
+				const w = bmp.width, h = bmp.height;
+				const scale = Math.min(1, 1600 / Math.max(w, h));
+				if (scale >= 1 && file.size < 700 * 1024) { bmp.close(); return file; }
+				const nw = Math.round(w * scale), nh = Math.round(h * scale);
+				const cv = document.createElement('canvas');
+				cv.width = nw; cv.height = nh;
+				cv.getContext('2d')!.drawImage(bmp, 0, 0, nw, nh);
+				bmp.close();
+				const blob = await toBlob(cv);
+				if (!blob) return file;
+				return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
+			} catch {}
+			const url = URL.createObjectURL(file);
+			const img = await new Promise<HTMLImageElement>((res, rej) => {
+				const im = new Image();
+				im.onload = () => res(im);
+				im.onerror = rej;
+				im.src = url;
+			});
+			URL.revokeObjectURL(url);
+			const w = img.naturalWidth, h = img.naturalHeight;
+			const scale = Math.min(1, 1600 / Math.max(w, h));
+			if (scale >= 1 && file.size < 700 * 1024) return file;
+			const nw = Math.round(w * scale), nh = Math.round(h * scale);
+			const cv = document.createElement('canvas');
+			cv.width = nw; cv.height = nh;
+			cv.getContext('2d')!.drawImage(img, 0, 0, nw, nh);
+			const blob = await toBlob(cv);
+			if (!blob) return file;
+			return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
+		} catch { return file; }
+	}
+
 	async function confirmUpload() {
 		if (!selected || pendingFiles.length === 0) return;
 		uploadBusy = true;
 		uploadMsg = '';
 		try {
 			const fd = new FormData();
-			for (const f of pendingFiles) fd.append('files', f);
+			for (let i = 0; i < pendingFiles.length; i++) {
+				const f = pendingFiles[i];
+				if (f.type.startsWith('image/')) {
+					uploadMsg = `Mengkompresi ${i + 1}/${pendingFiles.length}...`;
+					const cf = await compressImage(f);
+					fd.append('files', cf, cf.name);
+				} else fd.append('files', f);
+			}
+			uploadMsg = 'Mengupload...';
 			const res = await fetch(`/api/admin/upload?slug=${encodeURIComponent(selected)}`, { method: 'POST', body: fd });
 			const j = await res.json().catch(() => null);
 			if (!res.ok) {
@@ -1175,7 +1223,7 @@
 								</div>
 							{:else}
 								<button class="btn btn-ghost" onclick={startPick} disabled={uploadBusy}><Upload size={14} /> Pilih Foto (max 12)</button>
-								<span class="hint">JPG/PNG/WEBP, max 8MB per file, auto-kompresi 1600px</span>
+								<span class="hint">JPG/PNG/WEBP, max 20MB per file — foto besar otomatis dikompresi di browser (1600px, ~82%)</span>
 							{/if}
 						</div>
 						{#if pendingFiles.length === 0 && currentGallery().length > 0}
