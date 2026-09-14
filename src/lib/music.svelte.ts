@@ -74,6 +74,22 @@ function setPlaying(playing: boolean) {
 	musicState.update((s) => ({ ...s, started: true, playing }));
 }
 
+/** Hangatkan audio/YouTube sebelum tombol "Buka Undangan" diklik —
+ *  supaya play() tidak men-trigger fetch+decode di frame yang sama dengan tirai. */
+export function preloadMusic() {
+	if (typeof window === 'undefined') return;
+	if (currentSource() === 'url') {
+		const a = ensureAudio();
+		if (!a) return;
+		try {
+			a.load();
+		} catch {}
+		return;
+	}
+	// youtube: bootstrap API script lebih awal, bootYT() jadi cepat saat klik.
+	void loadApi();
+}
+
 function ensureAudio(): HTMLAudioElement | null {
 	if (typeof window === 'undefined') return null;
 	const s = currentSrc();

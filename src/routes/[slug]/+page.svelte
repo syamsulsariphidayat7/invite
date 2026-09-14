@@ -9,7 +9,7 @@
 	import { layouts } from '$lib/layouts/registry';
 	import { isKnownTemplate } from '$lib/layouts/meta';
 	import type { LayoutProps } from '$lib/layouts/types';
-	import { startMusic, setMusicConfig } from '$lib/music.svelte';
+	import { startMusic, setMusicConfig, preloadMusic } from '$lib/music.svelte';
 	import type { ResolvedWedding } from '$lib/data/resolve';
 
 	let { data } = $props();
@@ -80,6 +80,10 @@
 		if (th?.secondary) document.documentElement.style.setProperty('--paper', th.secondary);
 		const mu = (r?.music as { src?: string; youtubeId?: string; source?: 'url' | 'youtube'; startSeconds?: number } | undefined);
 		if (mu !== undefined) setMusicConfig({ src: mu.src ?? '', youtubeId: mu.youtubeId, startSeconds: mu.startSeconds, source: mu.source });
+		// Warm-up musik di idle (setelah aset kritis/LCP) supaya play saat klik tidak tersendat.
+		const idle = (window as unknown as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => void }).requestIdleCallback;
+		if (idle) idle(() => preloadMusic(), { timeout: 500 });
+		else setTimeout(preloadMusic, 300);
 		if (page.url.searchParams.has('preview')) {
 			opened = true;
 			overlayVisible = false;
@@ -98,7 +102,9 @@
 		if (opened) return;
 		opened = true;
 		document.body.style.overflow = '';
-		startMusic();
+		// mulai musik ~150ms setelah frame animasi pertama — decode/buffer tidak
+		// menumpuk di frame yang sama dengan tirai (tetap 60fps)
+		setTimeout(() => void startMusic(), 150);
 		window.scrollTo({ top: 0 });
 
 		// mulai animasi reveal setelah konten terlihat & tirai hampir selesai
