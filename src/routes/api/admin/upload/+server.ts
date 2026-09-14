@@ -124,7 +124,27 @@ export async function DELETE({ locals, url }) {
 		const idx = delUrl.indexOf(marker);
 		if (idx !== -1) {
 			const path = decodeURIComponent(delUrl.slice(idx + marker.length).split('?')[0]);
-			await supabase.storage.from('invitation-photos').remove([path]);
+			const isOwnFolder = path === slug || path.startsWith(slug + '/');
+			if (!isOwnFolder) {
+				console.warn(`[upload] skip physical delete: ${path} bukan milik ${slug}`);
+			} else {
+				const { db } = await import('$lib/server/db');
+				const { env } = await import('$env/dynamic/private');
+				if (env.DATABASE_URL) {
+					try {
+						const rows = (await db()`SELECT 1 FROM invitations WHERE subdomain != ${slug} AND data_json::text LIKE ${'%' + delUrl + '%'} LIMIT 1`) as unknown as { '?column?': number }[];
+						if (rows.length > 0) {
+							console.warn(`[upload] skip physical delete: ${delUrl} masih dipakai slug lain`);
+						} else {
+							await supabase.storage.from('invitation-photos').remove([path]);
+						}
+					} catch {
+						await supabase.storage.from('invitation-photos').remove([path]);
+					}
+				} else {
+					await supabase.storage.from('invitation-photos').remove([path]);
+				}
+			}
 		}
 	} catch {}
 	return json({ gallery: next, photos: nextPhotos ?? photos });
