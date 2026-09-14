@@ -8,11 +8,19 @@
 	const w = $derived((weddingData ?? wedding) as typeof wedding & { calendarUrlResolved?: string });
 	const heroNames = $derived(w.namesShort.split(' & '));
 	const calUrl = $derived((w as unknown as Record<string, string>).calendarUrlResolved ?? calendarUrl);
+	const slides = $derived(
+		Array.isArray((w.photos as Record<string, unknown>).heroSlides)
+			? ((w.photos as Record<string, unknown>).heroSlides as string[]).filter((s) => typeof s === 'string' && s.trim())
+			: []
+	);
+	const heroList = $derived(slides.length > 0 ? slides : [w.photos.hero]);
 </script>
 
 <section id="home" class="hero" aria-label="Pembukaan undangan">
 	<div class="bg">
-		<Photo base={w.photos.hero} alt={`Foto pasangan ${w.namesShort}`} eager />
+		{#each heroList as base, i}
+			<Photo base={base} alt={`Foto pasangan ${w.namesShort}`} eager={i === 0} klass={heroList.length > 1 ? 'slide' : ''} />
+		{/each}
 	</div>
 	<div class="veil"></div>
 
@@ -68,6 +76,30 @@
 	.bg {
 		position: absolute;
 		inset: 0;
+	}
+
+	.bg :global(.slide) {
+		animation: heroFade 25s infinite;
+		opacity: 0;
+	}
+
+	.bg :global(.slide:nth-child(1)) { animation-delay: 0s; opacity: 1; }
+	.bg :global(.slide:nth-child(2)) { animation-delay: 5s; }
+	.bg :global(.slide:nth-child(3)) { animation-delay: 10s; }
+	.bg :global(.slide:nth-child(4)) { animation-delay: 15s; }
+	.bg :global(.slide:nth-child(5)) { animation-delay: 20s; }
+
+	@keyframes heroFade {
+		0% { opacity: 0; }
+		4% { opacity: 1; }
+		20% { opacity: 1; }
+		24% { opacity: 0; }
+		100% { opacity: 0; }
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.bg :global(.slide) { animation: none; opacity: 0; }
+		.bg :global(.slide:nth-child(1)) { opacity: 1; }
 	}
 
 	.veil {

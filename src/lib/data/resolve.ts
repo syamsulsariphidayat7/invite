@@ -79,13 +79,24 @@ export function resolveWedding(dataJson: Record<string, unknown> | null | undefi
 		source: pick(verseDj.source, wedding.verse.source)
 	};
 
+	const heroSlidesDj = Array.isArray((dj as Record<string, unknown>).hero_slides)
+		? ((dj as Record<string, unknown>).hero_slides as string[]).filter((s) => typeof s === 'string' && s.trim())
+		: Array.isArray((photosDj as Record<string, unknown> | null)?.heroSlides)
+			? ((photosDj as Record<string, unknown>).heroSlides as string[]).filter((s) => typeof s === 'string' && s.trim())
+			: null;
 	const photos = {
 		...wedding.photos,
 		hero: (photosDj?.hero?.trim() ? photosDj.hero.trim() : (galleryDj?.[0] ?? wedding.photos.hero)) as string,
 		bride: (photosDj?.bride?.trim() ? photosDj.bride.trim() : wedding.photos.bride) as string,
 		groom: (photosDj?.groom?.trim() ? photosDj.groom.trim() : wedding.photos.groom) as string,
 		cover: (photosDj?.cover?.trim() ? photosDj.cover.trim() : wedding.photos.cover) as string,
-		gallery: galleryDj && galleryDj.length > 0 ? galleryDj : wedding.photos.gallery
+		gallery: galleryDj && galleryDj.length > 0 ? galleryDj : wedding.photos.gallery,
+		heroSlides:
+			heroSlidesDj && heroSlidesDj.length > 0
+				? heroSlidesDj
+				: galleryDj && galleryDj.length > 0
+					? galleryDj.slice(0, 5)
+					: wedding.photos.heroSlides
 	};
 
 	const story = storyDj && storyDj.length > 0 ? {
