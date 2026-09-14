@@ -19,12 +19,28 @@ const defaultSource: 'url' | 'youtube' = defaultSrc ? 'url' : (defaultYtId ? 'yo
 export function setMusicConfig(config: {
 	src?: string | null;
 	youtubeId?: string | null;
-	startSeconds?: number;
+	startSeconds?: number | string;
 	source?: 'url' | 'youtube';
 }) {
 	if (config.src !== undefined) overrideSrc = config.src?.trim() || null;
 	if (config.youtubeId !== undefined) overrideYtId = config.youtubeId?.trim() || null;
-	if (typeof config.startSeconds === 'number') overrideStartAt = config.startSeconds;
+	if (config.startSeconds !== undefined) {
+		const raw = config.startSeconds as number | string;
+		let parsed: number | null = null;
+		if (typeof raw === 'number' && Number.isFinite(raw)) parsed = Math.max(0, Math.floor(raw));
+		else if (typeof raw === 'string') {
+			const t = raw.trim();
+			const parts = t.split(':').map((p) => p.trim());
+			if (parts.length === 2) {
+				const m = Number(parts[0]), sec = Number(parts[1]);
+				if (Number.isFinite(m) && Number.isFinite(sec) && m >= 0 && sec >= 0 && sec < 60) parsed = m * 60 + sec;
+			} else if (parts.length === 1) {
+				const n = Number(parts[0]);
+				if (Number.isFinite(n)) parsed = Math.max(0, Math.floor(n));
+			}
+		}
+		if (parsed !== null) overrideStartAt = parsed;
+	}
 	if (config.source) overrideSource = config.source;
 	if (audio && overrideSrc !== null) {
 		try { audio.src = overrideSrc; audio.load(); } catch {}

@@ -394,8 +394,12 @@
 		kontenMusic = (dj.music_url as string) ?? (typeof mDj?.src === 'string' ? mDj.src : '');
 		kontenMusicSource = (dj.music_source as 'url' | 'youtube') ?? (typeof mDj?.source === 'string' ? (mDj.source as 'url' | 'youtube') : (kontenMusic ? 'url' : 'youtube'));
 		kontenMusicYt = (dj.music_youtube_id as string) ?? (typeof mDj?.youtubeId === 'string' ? mDj.youtubeId : '');
-		const musicStartRaw = (dj.music_start_seconds as number | string | undefined) ?? (typeof mDj?.startSeconds === 'number' ? mDj.startSeconds : null);
-		kontenMusicStart = musicStartRaw == null ? '' : String(musicStartRaw);
+		const musicStartRaw = (dj.music_start_seconds as number | string | undefined) ?? (typeof mDj?.startSeconds === 'number' ? mDj.startSeconds : typeof mDj?.startSeconds === 'string' ? mDj.startSeconds : null);
+		if (musicStartRaw == null || musicStartRaw === '') kontenMusicStart = '';
+		else if (typeof musicStartRaw === 'number' && Number.isFinite(musicStartRaw)) {
+			const m = Math.floor(musicStartRaw / 60), s = musicStartRaw % 60;
+			kontenMusicStart = musicStartRaw < 60 ? String(musicStartRaw) : `${m}:${String(s).padStart(2, '0')}`;
+		} else kontenMusicStart = String(musicStartRaw);
 		kontenGiftNote = (dj.gift_note as string) ?? ((dj.gift as Record<string, string> | undefined)?.note ?? '');
 		const vn = (dj.venue as Record<string, string> | undefined) ?? null;
 		kontenVenue = { name: vn?.name ?? '', address: vn?.address ?? '', maps_url: vn?.maps_url ?? vn?.mapsUrl ?? '' };
@@ -456,10 +460,19 @@
 				music_source: kontenMusicSource,
 				music_url: kontenMusic.trim() || null,
 				music_youtube_id: kontenMusicYt.trim() || null,
-				music_start_seconds:
-					kontenMusicStart === '' || kontenMusicStart == null || Number.isNaN(Number(kontenMusicStart))
-						? null
-						: Number(kontenMusicStart),
+				music_start_seconds: (() => {
+					if (kontenMusicStart === '' || kontenMusicStart == null) return null;
+					const s = String(kontenMusicStart).trim();
+					const parts = s.split(':').map((p) => p.trim());
+					if (parts.length === 2) {
+						const m = Number(parts[0]), sec = Number(parts[1]);
+						if (Number.isFinite(m) && Number.isFinite(sec) && m >= 0 && sec >= 0 && sec < 60) return m * 60 + sec;
+						return null;
+					}
+					const n = Number(parts[0]);
+					if (!Number.isFinite(n)) return null;
+					return Math.max(0, Math.floor(n));
+				})(),
 				gift_note: kontenGiftNote.trim() || null,
 				venue:
 					kontenVenue.name.trim() || kontenVenue.address.trim() || kontenVenue.maps_url.trim()
@@ -1329,7 +1342,7 @@
 							{:else}
 								<label><span>YouTube ID / Link</span><input placeholder="dQw4w9WgXcQ atau https://youtu.be/..." bind:value={kontenMusicYt} /></label>
 							{/if}
-							<label><span>Mulai detik ke-</span><input type="number" min="0" max="600" bind:value={kontenMusicStart} /></label>
+							<label><span>Mulai (mm:ss atau detik)</span><input type="text" inputmode="text" placeholder="0:05  atau  1:30  atau  90" bind:value={kontenMusicStart} /></label>
 							<label><span>Livestream URL</span><input bind:value={kontenLivestream} /></label>
 						</section>
 

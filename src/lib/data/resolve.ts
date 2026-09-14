@@ -32,7 +32,25 @@ export function resolveWedding(dataJson: Record<string, unknown> | null | undefi
 	const rawMusicUrl = (dj.music_url as string | null | undefined) ?? (musicDj?.src as string | null | undefined) ?? null;
 	const rawYoutubeId = (dj.music_youtube_id as string | undefined) ?? (musicDj?.youtubeId as string | undefined) ?? null;
 	const rawMusicSource = (dj.music_source as string | undefined) ?? (musicDj?.source as string | undefined) ?? null;
-	const rawStartSeconds = (dj.music_start_seconds as number | string | undefined) ?? (musicDj?.startSeconds as number | string | undefined) ?? null;
+	function parseStartSeconds(v: number | string | undefined | null): number | null {
+		if (v == null || v === '') return null;
+		if (typeof v === 'number' && Number.isFinite(v)) return Math.max(0, Math.floor(v));
+		const s = String(v).trim();
+		if (!s) return null;
+		const parts = s.split(':').map((p) => p.trim());
+		if (parts.length === 2) {
+			const m = Number(parts[0]), sec = Number(parts[1]);
+			if (Number.isFinite(m) && Number.isFinite(sec) && m >= 0 && sec >= 0 && sec < 60) return m * 60 + sec;
+		}
+		if (parts.length === 1) {
+			const n = Number(parts[0]);
+			if (Number.isFinite(n)) return Math.max(0, Math.floor(n));
+		}
+		return null;
+	}
+	const rawStartSeconds = parseStartSeconds(
+		(dj.music_start_seconds as number | string | undefined) ?? (musicDj?.startSeconds as number | string | undefined) ?? null
+	);
 	const giftNoteRaw = (dj.gift_note as string | undefined) ?? ((dj.gift as Record<string, string> | undefined)?.note as string | undefined) ?? null;
 	const storyIntro = (dj.love_story_intro as string | undefined) ?? null;
 	const storyDj = Array.isArray(dj.love_story) ? (dj.love_story as { title?: string; text?: string }[]) : null;
@@ -136,10 +154,7 @@ export function resolveWedding(dataJson: Record<string, unknown> | null | undefi
 					src: rawMusicUrl ?? '',
 					youtubeId: rawYoutubeId ?? '',
 					source: musicSource as 'url' | 'youtube',
-					startSeconds:
-						rawStartSeconds != null && Number.isFinite(Number(rawStartSeconds))
-							? Number(rawStartSeconds)
-							: wedding.music.startSeconds
+					startSeconds: rawStartSeconds ?? wedding.music.startSeconds
 				}
 			: { ...wedding.music, source: (wedding.music as { source?: 'url' | 'youtube' }).source ?? musicSource };
 
