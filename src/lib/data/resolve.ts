@@ -11,8 +11,31 @@ function pick<T>(v: T | null | undefined, fallback: T): T {
 	return v;
 }
 
-export function resolveWedding(dataJson: Record<string, unknown> | null | undefined): ResolvedWedding {
+function formatDayLabel(date: string): string {
+	try {
+		return new Date(date).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+	} catch {
+		return '';
+	}
+}
+
+export function resolveWedding(
+	dataJson: Record<string, unknown> | null | undefined,
+	tanggalAcara?: string | null
+): ResolvedWedding {
 	if (!dataJson || Object.keys(dataJson).length === 0) {
+		if (tanggalAcara) {
+			return {
+				...wedding,
+				resepsi: {
+					...wedding.resepsi,
+					dayLabel: formatDayLabel(tanggalAcara),
+					dateISO: new Date(tanggalAcara + 'T08:00:00+07:00').toISOString()
+				},
+				resolved: false,
+				calendarUrlResolved: defaultCalendarUrl
+			};
+		}
 		return { ...wedding, resolved: false, calendarUrlResolved: defaultCalendarUrl };
 	}
 	const dj = dataJson as Record<string, unknown>;
@@ -140,7 +163,7 @@ export function resolveWedding(dataJson: Record<string, unknown> | null | undefi
 		eventCount = filtered.length;
 		const mapped = filtered.map((e) => ({
 			title: e.name ?? '',
-			dayLabel: e.date ? new Date(e.date).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '',
+			dayLabel: e.date ? formatDayLabel(e.date) : '',
 			time: e.time ?? '',
 			dateISO: e.date ? new Date(e.date + 'T08:00:00+07:00').toISOString() : wedding.resepsi.dateISO
 		}));
@@ -156,6 +179,12 @@ export function resolveWedding(dataJson: Record<string, unknown> | null | undefi
 		const loc = eventsDj.find((e) => e.location?.trim())?.location?.trim();
 		const murl = eventsDj.find((e) => e.map_url?.trim())?.map_url?.trim();
 		if ((loc || murl) && !venueDj) venue = { name: loc ? loc.split(',')[0].slice(0, 80) : wedding.venue.name, address: loc ?? wedding.venue.address, mapsUrl: murl ?? wedding.venue.mapsUrl };
+	} else if (tanggalAcara) {
+		resepsi = {
+			...wedding.resepsi,
+			dayLabel: formatDayLabel(tanggalAcara),
+			dateISO: new Date(tanggalAcara + 'T08:00:00+07:00').toISOString()
+		};
 	}
 
 	const musicSource = rawMusicSource === 'url' || rawMusicSource === 'youtube' ? rawMusicSource : (rawMusicUrl ? 'url' : (rawYoutubeId ? 'youtube' : 'url'));

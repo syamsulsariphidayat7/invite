@@ -18,7 +18,7 @@ export const load = async ({ params, url, setHeaders }) => {
 	const slug = inv?.subdomain ?? params.slug;
 	const { wishes, total } = await listWishesWithCount(slug, 30);
 	const gallery = inv?.dataJson && Array.isArray((inv.dataJson as Record<string, unknown>).gallery) ? ((inv.dataJson as Record<string, unknown>).gallery as string[]) : null;
-	const resolved = resolveWedding((inv?.dataJson as Record<string, unknown>) ?? null);
+	const resolved = resolveWedding((inv?.dataJson as Record<string, unknown>) ?? null, inv?.tanggalAcara ?? null);
 	const template = (inv?.template?.trim() || DEFAULT_TEMPLATE).toLowerCase();
 	return { wishes, total, slug, gallery, resolved, template, dataJson: inv?.dataJson ?? null, invitation: inv ? { subdomain: inv.subdomain, status: inv.status, template } : null };
 };

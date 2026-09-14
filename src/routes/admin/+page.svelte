@@ -1416,7 +1416,10 @@
 					<label><span>Pihak 1</span><input type="text" bind:value={formPihak1} placeholder="Ruhaeni" /></label>
 					<label><span>Pihak 2</span><input type="text" bind:value={formPihak2} placeholder="Asep Roni" /></label>
 				</div>
-				<label><span>Tanggal Acara</span><input type="date" bind:value={formTanggal} /></label>
+				<label>
+					<span>Tanggal Acara</span><input type="date" bind:value={formTanggal} />
+					<em class="hint">Tanggal ini dipakai di sampul & hero (Muncul s.d. diisi detail Acara di Konten).</em>
+				</label>
 				<label>
 					<span>Status</span>
 					<select bind:value={formStatus}>

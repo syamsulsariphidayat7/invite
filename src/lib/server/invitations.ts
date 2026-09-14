@@ -76,9 +76,16 @@ export async function createInvitation(input: {
 	accessPin?: string | null;
 	waTemplate?: string | null;
 }): Promise<InvitationRow> {
+	const dj = (input.dataJson ?? {}) as Record<string, unknown>;
+	if (input.tanggalAcara) {
+		const existing = Array.isArray(dj.events) && dj.events.length > 0;
+		if (!existing) {
+			dj.events = [{ name: 'Resepsi', date: input.tanggalAcara }];
+		}
+	}
 	const rows = (await db()`
 		INSERT INTO invitations (subdomain, nama_pihak_1, nama_pihak_2, tanggal_acara, template, data_json, status, access_pin, wa_template)
-		VALUES (${input.subdomain}, ${input.namaPihak1 ?? ''}, ${input.namaPihak2 ?? ''}, ${input.tanggalAcara ?? null}, ${input.template ?? 'classic'}, ${jsonb(input.dataJson ?? {})}, ${input.status ?? 'draft'}, ${input.accessPin ?? null}, ${input.waTemplate ?? null})
+		VALUES (${input.subdomain}, ${input.namaPihak1 ?? ''}, ${input.namaPihak2 ?? ''}, ${input.tanggalAcara ?? null}, ${input.template ?? 'classic'}, ${jsonb(dj)}, ${input.status ?? 'draft'}, ${input.accessPin ?? null}, ${input.waTemplate ?? null})
 		RETURNING id, subdomain, nama_pihak_1, nama_pihak_2, tanggal_acara, template, data_json, status, owner_email, access_pin, wa_template, created_at, updated_at
 	`) as unknown as DbRow[];
 	return toRow(rows[0]);
@@ -90,12 +97,21 @@ export async function updateInvitation(
 ): Promise<InvitationRow | null> {
 	const current = await getInvitation(subdomain);
 	if (!current) return null;
+	let dataJson = patch.dataJson ?? current.dataJson;
+	if (patch.tanggalAcara !== undefined) {
+		const dj = dataJson as Record<string, unknown>;
+		const events = Array.isArray(dj.events) ? dj.events : [];
+		const hasDates = (events as { date?: string }[]).some((e) => (e as { date?: string } | null)?.date?.trim());
+		if (patch.tanggalAcara && !hasDates) {
+			dataJson = { ...dj, events: [{ name: 'Resepsi', date: patch.tanggalAcara }] };
+		}
+	}
 	const next = {
 		namaPihak1: patch.namaPihak1 ?? current.namaPihak1,
 		namaPihak2: patch.namaPihak2 ?? current.namaPihak2,
 		tanggalAcara: patch.tanggalAcara !== undefined ? patch.tanggalAcara : current.tanggalAcara,
 		template: patch.template ?? current.template,
-		dataJson: patch.dataJson ?? current.dataJson,
+		dataJson,
 		status: patch.status ?? current.status,
 		accessPin: patch.accessPin !== undefined ? patch.accessPin : current.accessPin,
 		waTemplate: patch.waTemplate !== undefined ? patch.waTemplate : current.waTemplate
