@@ -81,4 +81,9 @@
 			display: none;
 		}
 	}
+
+	/* pause partikel saat sampul (tirai) masih tertutup — hemat frame drop */
+	body:has(.cover:not(.hide)) .part {
+		animation-play-state: paused;
+	}
 </style>

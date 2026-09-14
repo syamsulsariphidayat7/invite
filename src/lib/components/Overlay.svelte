@@ -58,15 +58,26 @@
 		display: grid;
 		place-items: center;
 		overflow-y: auto;
-		/* efek tirai: overlay naik ke atas (sama seperti referensi removeModals) */
-		transition: transform 3s ease-in-out, visibility 0s linear 3s;
+		/* efek tirai: overlay naik ke atas — cepat & GPU (60fps),
+		   cubic-bezier percepatan konstan, tanpa jank blur/repaint */
+		contain: paint;
+		transform: translateZ(0);
+		backface-visibility: hidden;
+		transition:
+			transform 1.1s cubic-bezier(0.76, 0, 0.24, 1),
+			visibility 0s linear 1.1s;
 		will-change: transform;
 	}
 
 	.cover.hide {
-		transform: translateY(-200%);
+		transform: translate3d(0, -100%, 0);
 		visibility: hidden;
 		pointer-events: none;
+	}
+
+	.cover.hide .btn-open,
+	.cover.hide .inner {
+		backdrop-filter: none;
 	}
 
 	.bg {
@@ -77,9 +88,7 @@
 	.veil {
 		position: absolute;
 		inset: 0;
-		background:
-			radial-gradient(120% 90% at 50% 10%, rgba(107, 107, 107, 0.35), rgba(43, 43, 43, 0.86) 75%),
-			linear-gradient(180deg, rgba(30, 23, 14, 0.55), rgba(20, 15, 8, 0.92));
+		background: linear-gradient(180deg, rgba(30, 23, 14, 0.62), rgba(20, 15, 8, 0.95));
 	}
 
 	.inner {

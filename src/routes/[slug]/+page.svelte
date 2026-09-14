@@ -99,13 +99,14 @@
 		opened = true;
 		document.body.style.overflow = '';
 		startMusic();
-
-		// mulai animasi reveal setelah konten terlihat
-		setupReveals();
 		window.scrollTo({ top: 0 });
 
-		// lepas overlay setelah animasi tirai selesai (3s + jeda)
-		setTimeout(() => (overlayVisible = false), 3200);
+		// mulai animasi reveal setelah konten terlihat & tirai hampir selesai
+		// (tunda kerja berat dari main thread agar tirai tetap 60fps)
+		setTimeout(setupReveals, 1000);
+
+		// lepas overlay setelah animasi tirai selesai (1.1s + jeda)
+		setTimeout(() => (overlayVisible = false), 1200);
 	}
 </script>
 

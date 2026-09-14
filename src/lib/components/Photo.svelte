@@ -24,6 +24,8 @@
 	src={src}
 	{alt}
 	loading={eager ? 'eager' : 'lazy'}
+	decoding={eager ? 'sync' : 'async'}
+	fetchpriority={eager ? 'high' : 'auto'}
 	class={['photo-img', klass, loaded ? 'is-loaded' : ''].filter(Boolean).join(' ')}
 	onerror={() => {
 		if (idx < sources.length - 1) idx += 1;
