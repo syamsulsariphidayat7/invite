@@ -79,15 +79,15 @@
 	}
 
 	.bg :global(.slide) {
-		animation: heroFade 25s infinite;
+		animation: heroFade 35s infinite ease-in-out;
 		opacity: 0;
 	}
 
 	.bg :global(.slide:nth-child(1)) { animation-delay: 0s; opacity: 1; }
-	.bg :global(.slide:nth-child(2)) { animation-delay: 5s; }
-	.bg :global(.slide:nth-child(3)) { animation-delay: 10s; }
-	.bg :global(.slide:nth-child(4)) { animation-delay: 15s; }
-	.bg :global(.slide:nth-child(5)) { animation-delay: 20s; }
+	.bg :global(.slide:nth-child(2)) { animation-delay: 7s; }
+	.bg :global(.slide:nth-child(3)) { animation-delay: 14s; }
+	.bg :global(.slide:nth-child(4)) { animation-delay: 21s; }
+	.bg :global(.slide:nth-child(5)) { animation-delay: 28s; }
 
 	@keyframes heroFade {
 		0% { opacity: 0; }
