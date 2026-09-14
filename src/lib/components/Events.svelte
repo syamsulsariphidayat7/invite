@@ -16,10 +16,30 @@
 	let left = $state({ d: 0, h: 0, m: 0, s: 0 });
 	let countdownRef: HTMLDivElement | null = $state(null);
 	let topVisible = $state(false);
+	let passed = $state(false);
+	let now = $state(Date.now());
+
+	const rtf = new Intl.RelativeTimeFormat('id', { numeric: 'auto' });
+	function relativeAgo(elapsedMs: number): string {
+		const sec = Math.round(elapsedMs / 1000);
+		if (sec < 60) return rtf.format(-sec, 'second');
+		const min = Math.round(sec / 60);
+		if (min < 60) return rtf.format(-min, 'minute');
+		const hr = Math.round(min / 60);
+		if (hr < 24) return rtf.format(-hr, 'hour');
+		const day = Math.round(hr / 24);
+		if (day < 30) return rtf.format(-day, 'day');
+		const mon = Math.round(day / 30);
+		if (mon < 12) return rtf.format(-mon, 'month');
+		return rtf.format(-Math.round(mon / 12), 'year');
+	}
 
 	onMount(() => {
 		const tick = () => {
-			const diff = Math.max(0, target - Date.now());
+			const t = Date.now();
+			now = t;
+			passed = t >= target;
+			const diff = Math.max(0, target - t);
 			left = {
 				d: Math.floor(diff / 86_400_000),
 				h: Math.floor((diff / 3_600_000) % 24),
@@ -58,21 +78,31 @@
 
 <section id="event" class="events" aria-label="Jadwal acara">
 	<BatikTexture variant="light" opacity={0.055} size={220} />
-	<div class="top-countdown" class:show={topVisible} aria-hidden={!topVisible}>
+	<div class="top-countdown" class:show={topVisible} aria-hidden={!topVisible || passed}>
+		{#if !passed}
 		{#each units as u}
 			<span class="tc-unit"><b>{pad(u.value)}</b><i>{u.label.slice(0, 3)}</i></span>
 			{#if u !== units[units.length - 1]}<span class="tc-sep">:</span>{/if}
 		{/each}
+		{/if}
 	</div>
 	<!-- ============ COUNTDOWN ============ -->
 	<div class="countdown-block wrap" bind:this={countdownRef}>
 		<p class="kicker" data-reveal>Wedding Event</p>
 		<h2 class="section-title" data-reveal style="--d:.06s">Our Special Wedding Event</h2>
 		<p class="lead" data-reveal style="--d:.12s">
-			Mohon doa & restunya untuk acara yang akan diselenggarakan pada:
+			{passed
+				? 'Mohon doa & restunya telah terwujud, acara berlangsung pada:'
+				: 'Mohon doa & restunya untuk acara yang akan diselenggarakan pada:'}
 		</p>
 		<p class="big-date" data-reveal style="--d:.18s">{(showAkad ? r.akad : r.resepsi).dayLabel}</p>
 
+		{#if passed}
+			<div class="done-block" data-reveal style="--d:.24s">
+				<b>Dilaksanakan pada {(showAkad ? r.akad : r.resepsi).dayLabel}</b>
+				<small>{relativeAgo(now - target)} yang lalu</small>
+			</div>
+		{:else}
 		<div class="countdown" data-reveal style="--d:.24s">
 			{#each units as u}
 				<div class="unit">
@@ -82,6 +112,7 @@
 				{#if u !== units[units.length - 1]}<span class="sep" aria-hidden="true">:</span>{/if}
 			{/each}
 		</div>
+		{/if}
 	</div>
 
 	<!-- ============ KARTU ACARA ============ -->
@@ -212,6 +243,34 @@
 		align-items: center;
 		justify-content: center;
 		gap: 0.4rem;
+	}
+
+	.done-block {
+		display: grid;
+		gap: 0.45rem;
+		justify-items: center;
+		text-align: center;
+		margin: 0 auto;
+		max-width: 30rem;
+		background: var(--card);
+		border: 1px solid var(--line);
+		border-radius: 16px;
+		box-shadow: var(--shadow-1);
+		padding: 1.1rem 1.4rem;
+	}
+
+	.done-block b {
+		font-family: var(--font-display);
+		font-weight: 400;
+		font-size: clamp(17px, 4.5vw, 22px);
+		color: var(--ink);
+		line-height: 1.35;
+	}
+
+	.done-block small {
+		font-size: 12px;
+		letter-spacing: 0.08em;
+		color: var(--ink-3);
 	}
 
 	.unit {
