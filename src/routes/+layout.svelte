@@ -1,33 +1,11 @@
 <script lang="ts">
 	import favicon from '$lib/assets/favicon.svg';
-	import { wedding } from '$lib/data/wedding';
 
 	let { children } = $props();
 </script>
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
-	<title>{wedding.siteTitle}</title>
-	<meta name="description" content={wedding.metaDescription} />
-	<link rel="canonical" href="https://invite.boundless.my.id/{wedding.slug}" />
-
-	<!-- Open Graph / WhatsApp / Facebook -->
-	<meta property="og:type" content="website" />
-	<meta property="og:url" content="https://invite.boundless.my.id/{wedding.slug}" />
-	<meta property="og:title" content={wedding.siteTitle} />
-	<meta property="og:description" content={wedding.metaDescription} />
-	<meta property="og:image" content="https://invite.boundless.my.id/photos/hero.jpg" />
-	<meta property="og:image:width" content="1200" />
-	<meta property="og:image:height" content="630" />
-	<meta property="og:image:alt" content="Foto Pernikahan {wedding.namesShort}" />
-	<meta property="og:site_name" content={wedding.siteTitle} />
-
-	<!-- Twitter -->
-	<meta name="twitter:card" content="summary_large_image" />
-	<meta name="twitter:title" content={wedding.siteTitle} />
-	<meta name="twitter:description" content={wedding.metaDescription} />
-	<meta name="twitter:image" content="https://invite.boundless.my.id/photos/hero.jpg" />
-
 	<meta name="robots" content="index,follow" />
 </svelte:head>
 

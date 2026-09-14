@@ -6,12 +6,15 @@ import { DEFAULT_TEMPLATE } from '$lib/layouts/meta';
 
 const FALLBACK_SLUG = 'demo';
 
-export const load = async ({ params, url }) => {
+export const load = async ({ params, url, setHeaders }) => {
 	const inv = await getInvitation(params.slug).catch(() => null);
 	if (!inv && params.slug !== FALLBACK_SLUG) error(404, 'Undangan tidak ditemukan.');
 	const isPreview = url.searchParams.get('preview') === '1';
 	if (inv && inv.status === 'draft' && !isPreview) error(404, 'Undangan belum tersedia.');
 	if (inv && inv.status === 'expired') error(410, 'Undangan telah berakhir.');
+	if (!isPreview && inv?.status === 'active') {
+		setHeaders({ 'cache-control': 'public, s-maxage=300, stale-while-revalidate=600' });
+	}
 	const slug = inv?.subdomain ?? params.slug;
 	const { wishes, total } = await listWishesWithCount(slug, 30);
 	const gallery = inv?.dataJson && Array.isArray((inv.dataJson as Record<string, unknown>).gallery) ? ((inv.dataJson as Record<string, unknown>).gallery as string[]) : null;
