@@ -99,8 +99,7 @@
 
 		{#if passed}
 			<div class="done-block" data-reveal style="--d:.24s">
-				<b>Dilaksanakan pada {(showAkad ? r.akad : r.resepsi).dayLabel}</b>
-				<small>{relativeAgo(now - target)} yang lalu</small>
+				<b>Acara telah berlangsung {relativeAgo(now - target)}</b>
 			</div>
 		{:else}
 		<div class="countdown" data-reveal style="--d:.24s">
