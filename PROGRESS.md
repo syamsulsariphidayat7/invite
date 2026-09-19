@@ -1,9 +1,9 @@
 # PROGRESS.md — Undangan (Invite)
 
-Terakhir diperbarui: 2026-09-08
+Terakhir diperbarui: 2026-09-14
 
 ## Fase Aktif
-**Tidak ada fase besar sedang berjalan** — semua fitur inti selesai (per 2026-09-08). Item terbuka hanya operasional: bersihkan data uji. Fase 6 (multi-layout) & 7 (custom domain) masih future.
+**Tidak ada fase besar sedang berjalan** — semua fitur inti selesai (per 2026-09-14). `demo` (Risma & Syamsul, 14 foto, 1 guest contoh) dipertahankan sebagai showroom untuk calon pembeli — tidak dihapus. Fase 6 (multi-layout) & 7 (custom domain) masih future.
 
 ## Status Fase
 | Fase | Status |
@@ -30,6 +30,12 @@ Terakhir diperbarui: 2026-09-08
 | Fix jsonb PATCH admin | ✅ (2026-09-07) — pola `${JSON.stringify(x)}::jsonb` di postgres.js ter-encode ganda → melanggar CHECK `jsonb_typeof='object'` → semua edit panel admin 500 "Internal Error". Diganti helper `jsonb()` (`sql.json()`) di `db.ts` untuk create+update; trigger `updated_at` dipasang; script migrasi kini bisa re-seed `data_json` (`ON CONFLICT DO UPDATE`) |
 | Admin Dark Mode + WA link kelola | ✅ (2026-09-08) — dark mode panel admin; tombol **Kirim Link Kelola** membuka WhatsApp dengan link `/{slug}/kelola` + PIN pengelola |
 | Foto & Peran di Admin | ✅ (2026-09-08) — satu pintu upload (`kind` hanya gallery/music) → semua foto masuk galeri; peran **Hero/Bride/Groom/Sampul** di-assign dari galeri (boleh rangkap) dengan badge peran di pojok foto (tanpa peran = badge "Galeri"); reorder ↑↓, hapus per foto, hapus massal |
+| Vercel Optimasi | ✅ (2026-09-14) — `vite.config.ts` region `sin1` (sejajar Supabase `ap-southeast-1`), hapus load dinamis turnstile, gabung `listWishes+count` jadi `COUNT(*) OVER()`, cache `GET /api/wishes` `s-maxage 15`, gabung stylesheet font |
+| Tirai 1.1s + Musik hangat | ✅ (2026-09-14) — tirai `Overlay` 3s→1.1s GPU 60fps; musik preload idle + delay 150ms; `mm:ss` input musik `1:30→90`; `pnpm-workspace` approve build `esbuild` |
+| Hero Slide + WA og fix + tanggal create | ✅ (2026-09-14) — hero slideshow fade 5-7s (slide auto dari `gallery[:5]`); root `+layout` hilangkan OG duplikat & cache `s-maxage 300`; tanggal acara create → seed `dataJson.events` + fallback `resolveWedding(tanggalAcara)` + hint UI |
+| Countdown terlewat | ✅ (2026-09-14) — `Events` saat tanggal lewat countdown diganti string `Acara telah berlangsung X yang lalu` (`Intl.RelativeTimeFormat id`) |
+| Upload 7MB + guard Storage | ✅ (2026-09-14) — kompresi client canvas 1600px lewat payload Vercel 4.5MB; guard `DELETE /api/admin/upload` tidak menghapus file lintas slug |
+| Integrasi / Fase Cek | ✅ (2026-09-14) — svelte-check 0 error, build OK; DB: 2 invitations (`demo` 14 foto/1 tamu uji, `ruhaeni-roni` 12 foto/8 ucapan/150 tamu); `demo` tetap aktif showroom, `ruhaeni-roni` production |
 | Hapus IG Filter | ✅ (2026-09-08) — fitur IG filter dihapus dari admin, `resolve.ts`, `wedding.ts`, dan `Gallery.svelte` |
 | Pre-production Cleanup | ✅ Selesai |
 | Deployment (Vercel + Supabase) | ✅ Selesai — auto-deploy dari GitHub, custom domain `invite.boundless.my.id`, `DATABASE_URL` Supabase aktif (API ucapan 200 + data terbaca; cutover dari Neon 2026-09-06) |

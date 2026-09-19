@@ -1,6 +1,6 @@
 # ARCHITECTURE.md — Peta Arsitektur Proyek Undangan
 
-Dibuat dari pemindaian menyeluruh (2026-09-07). Ini peta referensi: struktur, alur data, DB, API, env, dan catatan pengembangan.
+Dibuat dari pemindaian menyeluruh (2026-09-07), diperbarui 2026-09-14. Ini peta referensi: struktur, alur data, DB, API, env, dan catatan pengembangan.
 
 ## 1. Stack
 
@@ -10,8 +10,8 @@ Dibuat dari pemindaian menyeluruh (2026-09-07). Ini peta referensi: struktur, al
 | Bahasa | TypeScript strict |
 | Package manager | pnpm (workspace `pnpm-workspace.yaml` untuk esbuild) |
 | Database | Supabase Postgres (pooler Supavisor port 6543, mode transaksi), driver `postgres` (postgres.js), `prepare: false` |
-| Storage | Supabase Storage bucket `invitation-photos/{slug}/` via `@supabase/supabase-js` + kompresi `sharp` (1600px JPEG q82 mozjpeg) |
-| Deploy | Vercel (`@sveltejs/adapter-vercel`, runtime `nodejs24.x` — dikonfigurasi di `vite.config.ts`, **tidak ada `svelte.config.js`**) |
+| Storage | Supabase Storage bucket `invitation-photos/{slug}/` via `@supabase/supabase-js` + kompresi `sharp` (1600px JPEG q82 mozjpeg); guard `DELETE /api/admin/upload` skip hapus fisik lintas-slug (+ kompresi client canvas bila >4.5MB payload Vercel) |
+| Deploy | Vercel (`@sveltejs/adapter-vercel`, runtime `nodejs24.x` + `regions:['sin1']` sejajar Supabase `ap-southeast-1` — dikonfigurasi di `vite.config.ts`) |
 | Anti-spam | Rate limit in-memory + honeypot + Cloudflare Turnstile (aktif, env terisi) |
 | Ikon/font | lucide-svelte; Google Fonts di `src/app.html` |
 | Export admin | exceljs (XLSX) + jspdf (PDF) |
